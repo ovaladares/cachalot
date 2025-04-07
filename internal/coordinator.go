@@ -101,6 +101,10 @@ func (c *LocalCoordinator) Lock(key string) error {
 		return fmt.Errorf("failed to send user event: %w", err)
 	}
 
+	respCh := make(chan string)
+
+	c.lockRespsWaiting[key] = respCh
+
 	// I'll need to create a lock manager to be shared between coordinator and event worker
 	// this lock manager will be injected on worker
 }

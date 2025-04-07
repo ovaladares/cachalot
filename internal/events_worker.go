@@ -34,36 +34,34 @@ type ElectionState struct {
 }
 
 type EventsWorker struct {
-	nodeName   string
-	lockMap    *TTLLockMap
-	eventsChan chan serf.Event
-	logg       *slog.Logger
+	lockManager    LockManager
+	nodeName       string
+	eventsChan     chan serf.Event
+	logg           *slog.Logger
+	proposalsByKey map[string]map[string]*LockProposal
+	electionRounds map[string]int
+	electionsState map[string]*ElectionState
+	serf           *serf.Serf
+	mu             sync.RWMutex
 
-	stopChan         chan struct{}
-	timeFn           func() time.Time
-	proposalsByKey   map[string]map[string]*LockProposal
-	electionRounds   map[string]int
-	electionsState   map[string]*ElectionState
-	lockRespsWaiting map[string]chan string
-	serf             *serf.Serf
-	mu               sync.RWMutex
+	stopChan chan struct{}
+	timeFn   func() time.Time
 }
 
-func NewEventsWorker(nodeName string, lockMap *TTLLockMap, eventsChan chan serf.Event, logg *slog.Logger, serf *serf.Serf) *EventsWorker {
+func NewEventsWorker(lockManager LockManager, nodeName string, eventsChan chan serf.Event, logg *slog.Logger, serf *serf.Serf) *EventsWorker {
 	return &EventsWorker{
-		nodeName:   nodeName,
-		lockMap:    lockMap,
-		eventsChan: eventsChan,
-		logg:       logg,
-		serf:       serf,
+		lockManager: lockManager,
+		nodeName:    nodeName,
+		eventsChan:  eventsChan,
+		logg:        logg,
+		serf:        serf,
 
-		stopChan:         make(chan struct{}),
-		timeFn:           time.Now,
-		proposalsByKey:   make(map[string]map[string]*LockProposal),
-		electionRounds:   make(map[string]int),
-		electionsState:   make(map[string]*ElectionState),
-		lockRespsWaiting: make(map[string]chan string),
-		mu:               sync.RWMutex{},
+		stopChan:       make(chan struct{}),
+		timeFn:         time.Now,
+		proposalsByKey: make(map[string]map[string]*LockProposal),
+		electionRounds: make(map[string]int),
+		electionsState: make(map[string]*ElectionState),
+		mu:             sync.RWMutex{},
 	}
 }
 
@@ -163,13 +161,13 @@ func (w *EventsWorker) handleAcquireLockEvent(lock *Lock) error {
 		return nil
 	}
 
-	isLocked := w.lockMap.IsLocked(lock.Key)
+	isLocked := w.lockManager.isLocked(lock.Key)
 	if isLocked {
 		w.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", lock.Key, "node-id", currentNodeID)
 		return fmt.Errorf("lock already acquired by another node")
 	}
 
-	ok := w.lockMap.Acquire(lock.NodeID, lock.Key, DefaultLockDuration)
+	ok := w.lockManager.setLock(lock.Key, lock.NodeID)
 
 	if !ok {
 		return fmt.Errorf("failed to acquire lock")
@@ -220,10 +218,10 @@ func (w *EventsWorker) handleKeyVote(event *Event) error {
 	majority := nodesCount/2 + 1
 
 	if electionState.Votes >= majority {
-		if ch, ok := w.lockRespsWaiting[event.Key]; ok {
+		if ch, ok := w.lockManager.pendingLock(event.Key); ok {
 			w.logg.Info("Lock acquired through majority vote", "key", event.Key)
 
-			isLocked := w.lockMap.IsLocked(event.Key)
+			isLocked := w.lockManager.isLocked(event.Key)
 			if isLocked {
 				w.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", event.Key, "node-id", currentNodeID)
 				return fmt.Errorf("lock already acquired by another node")
@@ -231,7 +229,7 @@ func (w *EventsWorker) handleKeyVote(event *Event) error {
 
 			ch <- w.nodeName
 
-			delete(w.lockRespsWaiting, event.Key)
+			w.lockManager.deletePendingLock(event.Key)
 
 			l := &Lock{
 				Key:    event.Key,
@@ -328,7 +326,7 @@ func (w *EventsWorker) acquireLock(event *Lock) error {
 		NodeID: w.nodeName,
 	}
 
-	ok := w.lockMap.Acquire(w.nodeName, event.Key, DefaultLockDuration)
+	ok := w.lockManager.setLock(event.Key, w.nodeName)
 
 	if !ok {
 		return fmt.Errorf("failed to acquire lock")
