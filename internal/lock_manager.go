@@ -33,7 +33,7 @@ func NewLocalLockManager(serf *serf.Serf) *LocalLockManager {
 	}
 }
 
-func (lm *LocalLockManager) RequestLock(key, nodeID string, _ time.Duration) (chan string, error) { //TODO make duration work
+func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (chan string, error) { //TODO make duration work
 	event := Event{
 		Key:    key,
 		NodeID: nodeID,

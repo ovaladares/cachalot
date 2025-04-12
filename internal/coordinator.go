@@ -1,7 +1,6 @@
 package internal
 
 import (
-	"encoding/json"
 	"fmt"
 	"io"
 	"log/slog"
@@ -14,12 +13,19 @@ import (
 
 var DefaultLockDuration = 120 * time.Second
 
+type Coordinator interface {
+	Connect() error
+	GetNodeID() string
+	Lock(key string) error
+}
+
 type LocalCoordinator struct {
-	logg      *slog.Logger
-	bindAddr  string
-	seedNodes []string
-	nodeID    string
-	serf      *serf.Serf
+	logg        *slog.Logger
+	bindAddr    string
+	seedNodes   []string
+	nodeID      string
+	lockManager LockManager
+	serf        *serf.Serf
 }
 
 func NewLocalCoordinator(logg *slog.Logger, bindAddr string, seedNodes []string) *LocalCoordinator {
@@ -70,11 +76,15 @@ func (c *LocalCoordinator) Connect() error { //Maybe return a Node instance?
 
 	c.logg.Debug("Joined cluster", "node_id", currentNodeID, "known_nodes", joined)
 
-	worker := NewEventsWorker(currentNodeID, nil, eventsChan, c.logg, serfInstance)
+	lckManager := NewLocalLockManager(serfInstance)
+	electionManager := NewElectionManager(currentNodeID, c.logg, serfInstance, lckManager)
+
+	worker := NewEventsWorker(lckManager, electionManager, currentNodeID, eventsChan, c.logg, serfInstance)
 
 	go worker.Start(nil) //TODO add context
 
 	c.serf = serfInstance
+	c.lockManager = lckManager
 
 	return nil
 }
@@ -84,27 +94,22 @@ func (c *LocalCoordinator) GetNodeID() string {
 }
 
 func (c *LocalCoordinator) Lock(key string) error {
-	event := Event{
-		Key:    key,
-		NodeID: c.GetNodeID(),
-	}
-
-	b, err := json.Marshal(event)
+	ch, err := c.lockManager.AcquireLock(key, c.nodeID, DefaultLockDuration)
 
 	if err != nil {
-		return fmt.Errorf("failed to marshal event: %w", err)
+		return fmt.Errorf("failed to acquire lock: %w", err)
 	}
 
-	err = c.serf.UserEvent(claimKeyEventName, b, false)
+	select {
+	case nodeID := <-ch:
+		if nodeID != c.nodeID {
+			return fmt.Errorf("lock already acquired by another node")
+		}
 
-	if err != nil {
-		return fmt.Errorf("failed to send user event: %w", err)
+		c.logg.Debug("Lock acquired", "key", key, "node_id", nodeID)
+	case <-time.After(DefaultLockDuration):
+		return fmt.Errorf("lock acquisition timed out")
 	}
 
-	respCh := make(chan string)
-
-	c.lockRespsWaiting[key] = respCh
-
-	// I'll need to create a lock manager to be shared between coordinator and event worker
-	// this lock manager will be injected on worker
+	return nil
 }
