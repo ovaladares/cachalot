@@ -114,7 +114,7 @@ func (em *ElectionManager) HandleKeyVote(event *Event) error {
 func (em *ElectionManager) runElection(key string, round int) {
 	// Wait a short time to collect all proposals
 	// This should be tuned based on network characteristics
-	time.Sleep(100 * time.Millisecond) //TODO extract config
+	time.Sleep(2 * time.Second) //TODO extract config
 
 	if em.electionRounds[key] != round {
 		return
@@ -183,11 +183,11 @@ func (em *ElectionManager) AcquireLock(lock *Lock) error {
 		NodeID: em.nodeName,
 	}
 
-	ok := em.lockManager.setLock(lock.Key, em.nodeName)
+	// ok := em.lockManager.setLock(lock.Key, em.nodeName)
 
-	if !ok {
-		return fmt.Errorf("failed to acquire lock")
-	}
+	// if !ok {
+	// 	return fmt.Errorf("failed to acquire lock")
+	// }
 
 	b, err := json.Marshal(l)
 
@@ -209,7 +209,5 @@ func (em *ElectionManager) DeleteProposal(key string) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
 
-	if _, ok := em.proposalsByKey[key]; ok {
-		delete(em.proposalsByKey, key)
-	}
+	delete(em.proposalsByKey, key)
 }

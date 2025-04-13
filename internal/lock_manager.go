@@ -79,7 +79,5 @@ func (lm *LocalLockManager) deletePendingLock(key string) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
-	if _, ok := lm.lockRespsWaiting[key]; ok {
-		delete(lm.lockRespsWaiting, key)
-	}
+	delete(lm.lockRespsWaiting, key)
 }

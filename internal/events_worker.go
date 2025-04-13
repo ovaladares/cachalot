@@ -71,7 +71,7 @@ func (w *EventsWorker) Start(ctx context.Context) {
 						continue
 					}
 
-					w.logg.Debug("Member joined", "member", member.Name)
+					w.logg.Info("Member joined", "member", member.Name)
 				}
 			case serf.EventMemberLeave:
 				for _, member := range e.(serf.MemberEvent).Members {
@@ -80,7 +80,7 @@ func (w *EventsWorker) Start(ctx context.Context) {
 						continue
 					}
 
-					w.logg.Debug("Member left", "member", member.Name)
+					w.logg.Info("Member left", "member", member.Name)
 				}
 			case serf.EventMemberFailed:
 				for _, member := range e.(serf.MemberEvent).Members {
@@ -89,11 +89,13 @@ func (w *EventsWorker) Start(ctx context.Context) {
 						continue
 					}
 
-					w.logg.Debug("Member failed", "member", member.Name)
+					w.logg.Info("Member failed", "member", member.Name)
 				}
 			case serf.EventUser:
 				name := e.(serf.UserEvent).Name
 				payload := e.(serf.UserEvent).Payload
+
+				w.logg.Debug("User event received", "name", name, "payload", string(payload))
 
 				if name == claimKeyEventName {
 					var event Event
@@ -156,7 +158,7 @@ func (w *EventsWorker) handleAcquireLockEvent(lock *Lock) error {
 
 	isLocked := w.lockManager.isLocked(lock.Key)
 	if isLocked {
-		w.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", lock.Key, "node-id", currentNodeID)
+		w.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", lock.Key, "node-id", w.nodeName)
 		return fmt.Errorf("lock already acquired by another node")
 	}
 

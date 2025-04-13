@@ -1,6 +1,7 @@
 package internal
 
 import (
+	"context"
 	"fmt"
 	"io"
 	"log/slog"
@@ -74,14 +75,14 @@ func (c *LocalCoordinator) Connect() error { //Maybe return a Node instance?
 		c.logg.Warn("Failed to join cluster, running as standalone", "node_id", currentNodeID, "error", err)
 	}
 
-	c.logg.Debug("Joined cluster", "node_id", currentNodeID, "known_nodes", joined)
+	c.logg.Info("Joined cluster", "node_id", currentNodeID, "known_nodes", joined)
 
 	lckManager := NewLocalLockManager(serfInstance)
 	electionManager := NewElectionManager(currentNodeID, c.logg, serfInstance, lckManager)
 
 	worker := NewEventsWorker(lckManager, electionManager, currentNodeID, eventsChan, c.logg, serfInstance)
 
-	go worker.Start(nil) //TODO add context
+	go worker.Start(context.Background()) //TODO add context
 
 	c.serf = serfInstance
 	c.lockManager = lckManager
