@@ -87,6 +87,16 @@ func main() {
 		}
 	}()
 
+	go func() {
+		for {
+			time.Sleep(10 * time.Second)
+
+			locks, _ := coordinator.GetLocks()
+
+			fmt.Printf("Keys locked: %+v\n", locks)
+		}
+	}()
+
 	// Wait for either lock acquisition or termination signal
 	select {
 	case <-lockAcquired:

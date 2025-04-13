@@ -47,3 +47,13 @@ func (c *Coordinator) Lock(key string) error {
 
 	return nil
 }
+
+func (c *Coordinator) GetLocks() (map[string]string, error) {
+	locks, err := c.internal.GetLocks()
+
+	if err != nil {
+		return nil, err
+	}
+
+	return locks, nil
+}

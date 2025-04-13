@@ -11,10 +11,11 @@ import (
 
 type LockManager interface {
 	AcquireLock(key, nodeID string, duration time.Duration) (chan string, error)
-	isLocked(key string) bool
-	setLock(key, nodeID string) bool
-	pendingLock(key string) (chan string, bool)
-	deletePendingLock(key string)
+	GetLocks() (map[string]string, error)
+	IsLocked(key string) bool
+	SetLock(key, nodeID string) bool
+	PendingLock(key string) (chan string, bool)
+	DeletePendingLock(key string)
 }
 
 type LocalLockManager struct {
@@ -58,15 +59,15 @@ func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (ch
 	return respCh, nil
 }
 
-func (lm *LocalLockManager) isLocked(key string) bool {
+func (lm *LocalLockManager) IsLocked(key string) bool {
 	return lm.lockMap.IsLocked(key)
 }
 
-func (lm *LocalLockManager) setLock(key, nodeID string) bool {
+func (lm *LocalLockManager) SetLock(key, nodeID string) bool {
 	return lm.lockMap.Acquire(nodeID, key, DefaultLockDuration)
 }
 
-func (lm *LocalLockManager) pendingLock(key string) (chan string, bool) {
+func (lm *LocalLockManager) PendingLock(key string) (chan string, bool) {
 	lm.mu.RLock()
 	defer lm.mu.RUnlock()
 
@@ -75,9 +76,29 @@ func (lm *LocalLockManager) pendingLock(key string) (chan string, bool) {
 	return respCh, ok
 }
 
-func (lm *LocalLockManager) deletePendingLock(key string) {
+func (lm *LocalLockManager) DeletePendingLock(key string) {
 	lm.mu.Lock()
 	defer lm.mu.Unlock()
 
+	if respCh, ok := lm.lockRespsWaiting[key]; ok {
+		close(respCh)
+	}
+
 	delete(lm.lockRespsWaiting, key)
+}
+
+func (lm *LocalLockManager) GetLocks() (map[string]string, error) {
+	locks := lm.lockMap.Locks()
+
+	if locks == nil {
+		return nil, fmt.Errorf("failed to get locks")
+	}
+
+	locksMap := make(map[string]string)
+
+	for _, lock := range locks {
+		locksMap[lock.Key] = lock.NodeID
+	}
+
+	return locksMap, nil
 }

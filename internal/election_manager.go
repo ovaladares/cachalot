@@ -81,10 +81,10 @@ func (em *ElectionManager) HandleKeyVote(event *Event) error {
 	majority := nodesCount/2 + 1
 
 	if electionState.Votes >= majority {
-		if ch, ok := em.lockManager.pendingLock(event.Key); ok {
+		if ch, ok := em.lockManager.PendingLock(event.Key); ok {
 			em.logg.Info("Lock acquired through majority vote", "key", event.Key)
 
-			isLocked := em.lockManager.isLocked(event.Key)
+			isLocked := em.lockManager.IsLocked(event.Key)
 			if isLocked {
 				em.logg.Error("Lock already acquired", "msg", "Lock already acquired by another node, unable to acquire lock after majority vote", "key", event.Key, "node-id", em.nodeName)
 				return fmt.Errorf("lock already acquired by another node")
@@ -92,7 +92,7 @@ func (em *ElectionManager) HandleKeyVote(event *Event) error {
 
 			ch <- em.nodeName
 
-			em.lockManager.deletePendingLock(event.Key)
+			em.lockManager.DeletePendingLock(event.Key)
 
 			l := &Lock{
 				Key:    event.Key,

@@ -18,6 +18,7 @@ type Coordinator interface {
 	Connect() error
 	GetNodeID() string
 	Lock(key string) error
+	GetLocks() (map[string]string, error)
 }
 
 type LocalCoordinator struct {
@@ -113,4 +114,14 @@ func (c *LocalCoordinator) Lock(key string) error {
 	}
 
 	return nil
+}
+
+func (c *LocalCoordinator) GetLocks() (map[string]string, error) {
+	locks, _ := c.lockManager.GetLocks()
+
+	if locks == nil {
+		return nil, fmt.Errorf("failed to get locks")
+	}
+
+	return locks, nil
 }

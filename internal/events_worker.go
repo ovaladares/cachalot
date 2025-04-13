@@ -151,18 +151,21 @@ func (w *EventsWorker) Stop() {
 }
 
 func (w *EventsWorker) handleAcquireLockEvent(lock *Lock) error {
-	if lock.NodeID != w.nodeName {
-		w.logg.Debug("Ignoring acquire lock event", "node_id", lock.NodeID, "current_node_id", w.nodeName)
-		return nil
-	}
+	// if lock.NodeID != w.nodeName {
+	// 	w.logg.Info("Ignoring acquire lock event", "node_id", lock.NodeID, "current_node_id", w.nodeName)
 
-	isLocked := w.lockManager.isLocked(lock.Key)
+	// 	w.lockManager.deletePendingLock(lock.Key)
+
+	// 	return nil
+	// }
+
+	isLocked := w.lockManager.IsLocked(lock.Key)
 	if isLocked {
 		w.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", lock.Key, "node-id", w.nodeName)
 		return fmt.Errorf("lock already acquired by another node")
 	}
 
-	ok := w.lockManager.setLock(lock.Key, lock.NodeID)
+	ok := w.lockManager.SetLock(lock.Key, lock.NodeID)
 
 	if !ok {
 		return fmt.Errorf("failed to acquire lock")
