@@ -12,6 +12,18 @@ import (
 	"github.com/otaviovaladares/cachalot"
 )
 
+// Demo to show how to use the Coordinator
+// to acquire a lock at a specific time
+// Usage: go run main.go <bind_address> <seed_node> <lock_time>
+// Example: go run main.go localhost:7946 localhost:7949 14:30
+// This will attempt to acquire a lock at 14:30 (2:30 PM) local time
+// Note: The lock time should be in HH:MM format (24h)
+// The program will wait until the specified time to acquire the lock
+// and will print the status of the locks every 10 seconds
+// until the lock is acquired or the program is terminated
+// by pressing Ctrl+C
+// Spawn three differente process of this program, and see it working
+// The seed node for process B and C should be the bind address of process A
 func main() {
 	// Example usage of the Coordinator
 
