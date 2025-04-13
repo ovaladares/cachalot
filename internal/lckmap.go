@@ -6,7 +6,7 @@ import (
 )
 
 type TTLLockMap struct {
-	locks sync.Map
+	locks map[string]*Lock
 	mu    sync.RWMutex
 }
 
@@ -19,19 +19,24 @@ type Lock struct {
 }
 
 func NewTTLLockMap() *TTLLockMap {
-	return &TTLLockMap{}
+	return &TTLLockMap{
+		locks: make(map[string]*Lock),
+	}
 }
 
 func (m *TTLLockMap) Renew(key string, duration time.Duration) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if val, exists := m.locks.Load(key); exists {
-		lockItem := val.(*Lock)
+	if lockItem, exists := m.locks[key]; exists {
 		lockItem.timer.Stop()
 		lockItem.timer = time.AfterFunc(duration, func() {
-			m.locks.Delete(key)
+			m.mu.Lock()
+			defer m.mu.Unlock()
+
+			delete(m.locks, key)
 		})
+
 		lockItem.duration = duration
 
 		return true
@@ -44,26 +49,23 @@ func (m *TTLLockMap) Acquire(node, key string, duration time.Duration) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if existingVal, exists := m.locks.Load(key); exists {
-		existingLock := existingVal.(*Lock)
-		if time.Since(existingLock.createdAt) < existingLock.duration {
-			return false
-		}
-
+	if _, exists := m.locks[key]; exists {
 		return false
 	}
 
 	timer := time.AfterFunc(duration, func() {
-		m.locks.Delete(key)
+		m.mu.Lock()
+		defer m.mu.Unlock()
+		delete(m.locks, key)
 	})
 
-	m.locks.Store(key, &Lock{
+	m.locks[key] = &Lock{
 		Key:       key,
 		NodeID:    node,
 		timer:     timer,
 		duration:  duration,
 		createdAt: time.Now(),
-	})
+	}
 
 	return true
 }
@@ -72,10 +74,9 @@ func (m *TTLLockMap) Release(key string) bool {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
-	if val, exists := m.locks.Load(key); exists {
-		lockItem := val.(*Lock)
+	if lockItem, exists := m.locks[key]; exists {
 		lockItem.timer.Stop()
-		m.locks.Delete(key)
+		delete(m.locks, key)
 
 		return true
 	}
@@ -87,25 +88,22 @@ func (m *TTLLockMap) IsLocked(key string) bool {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	val, exists := m.locks.Load(key)
+	val, exists := m.locks[key]
 	if !exists {
 		return false
 	}
 
-	lockItem := val.(*Lock)
-	return time.Since(lockItem.createdAt) < lockItem.duration
+	return time.Since(val.createdAt) < val.duration
 }
 
 func (m *TTLLockMap) Locks() []Lock {
 	m.mu.RLock()
 	defer m.mu.RUnlock()
 
-	var locks []Lock
-	m.locks.Range(func(_, value interface{}) bool {
-		lockItem := value.(*Lock)
+	locks := make([]Lock, 0, len(m.locks))
+	for _, lockItem := range m.locks {
 		locks = append(locks, *lockItem)
-		return true
-	})
+	}
 
 	return locks
 }
