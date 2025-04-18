@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/serf/serf"
+	"github.com/otaviovaladares/cachalot/internal/discovery"
 )
 
 type LockManager interface {
@@ -21,16 +21,16 @@ type LockManager interface {
 type LocalLockManager struct {
 	lockRespsWaiting map[string]chan string
 	lockMap          *TTLLockMap
-	serf             *serf.Serf
+	clusterManager   discovery.ClusterManager
 
 	mu sync.RWMutex
 }
 
-func NewLocalLockManager(serf *serf.Serf) *LocalLockManager {
+func NewLocalLockManager(clusterManager discovery.ClusterManager) *LocalLockManager {
 	return &LocalLockManager{
 		lockRespsWaiting: make(map[string]chan string),
 		lockMap:          NewTTLLockMap(),
-		serf:             serf,
+		clusterManager:   clusterManager,
 	}
 }
 
@@ -50,7 +50,7 @@ func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (ch
 
 	lm.lockRespsWaiting[key] = respCh
 
-	err = lm.serf.UserEvent(claimKeyEventName, b, false)
+	err = lm.clusterManager.BroadcastEvent(claimKeyEventName, b)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to send user event: %w", err)

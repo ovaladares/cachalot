@@ -9,8 +9,18 @@ import (
 	"sync"
 	"time"
 
-	"github.com/hashicorp/serf/serf"
+	"github.com/otaviovaladares/cachalot/internal/discovery"
 )
+
+type LockProposal struct {
+	NodeID    string
+	Timestamp int64
+}
+
+type ElectionState struct {
+	Votes int
+	Round int
+}
 
 // ElectionManager handles the distributed election process for locks
 type ElectionManager struct {
@@ -19,18 +29,23 @@ type ElectionManager struct {
 	proposalsByKey map[string]map[string]*LockProposal
 	electionRounds map[string]int
 	electionsState map[string]*ElectionState
-	serf           *serf.Serf
+	clusterManager discovery.ClusterManager
 	lockManager    LockManager
 	mu             sync.RWMutex
 	timeFn         func() time.Time
 }
 
 // NewElectionManager creates a new ElectionManager
-func NewElectionManager(nodeName string, logg *slog.Logger, serf *serf.Serf, lockManager LockManager) *ElectionManager {
+func NewElectionManager(
+	nodeName string,
+	logg *slog.Logger,
+	lockManager LockManager,
+	clusterManager discovery.ClusterManager,
+) *ElectionManager {
 	return &ElectionManager{
 		nodeName:       nodeName,
 		logg:           logg,
-		serf:           serf,
+		clusterManager: clusterManager,
 		lockManager:    lockManager,
 		proposalsByKey: make(map[string]map[string]*LockProposal),
 		electionRounds: make(map[string]int),
@@ -77,7 +92,14 @@ func (em *ElectionManager) HandleKeyVote(event *Event) error {
 
 	electionState.Votes++
 
-	nodesCount := len(em.serf.Members())
+	nodesCount, err := em.clusterManager.GetMembersCount()
+
+	if err != nil {
+		em.logg.Error("Failed to get members count", "error", err)
+
+		return fmt.Errorf("failed to get members count: %w", err)
+	}
+
 	majority := nodesCount/2 + 1
 
 	if electionState.Votes >= majority {
@@ -167,7 +189,7 @@ func (em *ElectionManager) VoteForKey(event *Event) error {
 		return err
 	}
 
-	err = em.serf.UserEvent(voteForKeyEventName, b, false)
+	err = em.clusterManager.BroadcastEvent(voteForKeyEventName, b)
 
 	if err != nil {
 		return err
@@ -195,7 +217,7 @@ func (em *ElectionManager) AcquireLock(lock *Lock) error {
 		return fmt.Errorf("failed to marshal acquire lock event: %w", err)
 	}
 
-	err = em.serf.UserEvent(lockAcquiredEventName, b, false)
+	err = em.clusterManager.BroadcastEvent(lockAcquiredEventName, b)
 
 	if err != nil {
 		return fmt.Errorf("failed to send lock acquired event: %w", err)
