@@ -46,16 +46,15 @@ func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (ch
 		return nil, fmt.Errorf("failed to marshal event: %w", err)
 	}
 
-	respCh := make(chan string)
-
-	lm.lockRespsWaiting[key] = respCh
-
-	err = lm.clusterManager.BroadcastEvent(claimKeyEventName, b)
+	err = lm.clusterManager.BroadcastEvent(ClaimKeyEventName, b)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to send user event: %w", err)
 	}
 
+	respCh := make(chan string)
+
+	lm.lockRespsWaiting[key] = respCh
 	return respCh, nil
 }
 

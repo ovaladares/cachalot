@@ -13,20 +13,20 @@ type Event struct {
 	Round  int    `json:"round"`
 }
 
-const claimKeyEventName = "claim-key"
-const voteForKeyEventName = "vote-for-key"
-const lockAcquiredEventName = "lock-acquired"
+const ClaimKeyEventName = "claim-key"
+const VoteForKeyEventName = "vote-for-key"
+const LockAcquiredEventName = "lock-acquired"
 
 type ServiceDiscoveryEventHandler struct {
 	lockManager     LockManager
-	electionManager *ElectionManager
+	electionManager ElectionManager
 	nodeName        string
 	logg            *slog.Logger
 }
 
 func NewServiceDiscoveryEventHandler(
 	lockManager LockManager,
-	electionManager *ElectionManager,
+	electionManager ElectionManager,
 	nodeName string,
 	logg *slog.Logger,
 ) *ServiceDiscoveryEventHandler {
@@ -52,11 +52,11 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 		h.handleMemberLeave(event)
 	case discovery.MemberFailedEventType:
 		h.handleMemberFailed(event)
-	case claimKeyEventName:
+	case ClaimKeyEventName:
 		h.handleClaimEvent(event)
-	case voteForKeyEventName:
+	case VoteForKeyEventName:
 		h.handleVoteForKeyEvent(event)
-	case lockAcquiredEventName:
+	case LockAcquiredEventName:
 		h.handleAcquireLockEvent(event)
 	default:
 		h.logg.Warn("unknown event type", "type", event.Type)
@@ -107,6 +107,8 @@ func (h *ServiceDiscoveryEventHandler) handleAcquireLockEvent(cEvent *discovery.
 	isLocked := h.lockManager.IsLocked(lock.Key)
 	if isLocked {
 		h.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", lock.Key, "node-id", h.nodeName)
+
+		return
 	}
 
 	ok := h.lockManager.SetLock(lock.Key, lock.NodeID)
