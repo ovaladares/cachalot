@@ -1,8 +1,6 @@
 package cachalot
 
 import (
-	"log/slog"
-
 	"github.com/otaviovaladares/cachalot/internal"
 )
 
@@ -10,21 +8,26 @@ type Coordinator struct {
 	internal internal.Coordinator
 }
 
-type CoordinatorConfig struct {
-	logg *slog.Logger
-}
+func NewCoordinator(bindAddr string, seedNodes []string, config *Config) *Coordinator {
+	conf := NewConfig(config)
 
-func NewCoordinator(bindAddr string, seedNodes []string, config *CoordinatorConfig) *Coordinator {
-	var logger *slog.Logger
-	if config != nil && config.logg != nil {
-		logger = config.logg
-	} else {
-		logger = slog.Default()
-	}
-	logger.Debug("Creating new local coordinator")
+	conf.Logger.Debug("Creating new local coordinator")
+
+	localCoordinator := internal.NewLocalCoordinator(
+		conf.Logger,
+		bindAddr,
+		seedNodes,
+		&internal.CoordinatorConfig{
+			DefaultLockDuration: conf.DefaultLockDuration,
+			DiscoveryProvider:   conf.DiscoveryBackend,
+			ElectionConfig: &internal.ElectionConfig{
+				TimeToWaitForVotes: conf.ElectionConfig.TimeToWaitForVotes,
+			},
+		},
+	)
 
 	return &Coordinator{
-		internal: internal.NewLocalCoordinator(logger, bindAddr, seedNodes),
+		internal: localCoordinator,
 	}
 }
 

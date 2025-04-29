@@ -42,6 +42,7 @@ type DistributedElectionManager struct {
 	lockManager    LockManager
 	mu             sync.RWMutex
 	timeFn         func() time.Time
+	conf           *ElectionConfig
 }
 
 // NewElectionManager creates a new DistributedElectionManager
@@ -50,6 +51,7 @@ func NewElectionManager(
 	logg *slog.Logger,
 	lockManager LockManager,
 	clusterManager discovery.ClusterManager,
+	conf *ElectionConfig,
 ) ElectionManager {
 	return &DistributedElectionManager{
 		nodeName:       nodeName,
@@ -61,6 +63,7 @@ func NewElectionManager(
 		electionsState: make(map[string]*ElectionState),
 		mu:             sync.RWMutex{},
 		timeFn:         time.Now,
+		conf:           conf,
 	}
 }
 
@@ -145,7 +148,7 @@ func (em *DistributedElectionManager) HandleKeyVote(event *Event) error {
 func (em *DistributedElectionManager) runElection(key string, round int) {
 	// Wait a short time to collect all proposals
 	// This should be tuned based on network characteristics
-	time.Sleep(2 * time.Second) //TODO extract config
+	time.Sleep(em.conf.TimeToWaitForVotes)
 
 	if em.electionRounds[key] != round {
 		return
@@ -213,12 +216,6 @@ func (em *DistributedElectionManager) AcquireLock(lock *Lock) error {
 		Key:    lock.Key,
 		NodeID: em.nodeName,
 	}
-
-	// ok := em.lockManager.setLock(lock.Key, em.nodeName)
-
-	// if !ok {
-	// 	return fmt.Errorf("failed to acquire lock")
-	// }
 
 	b, err := json.Marshal(l)
 
