@@ -8,13 +8,21 @@ import (
 	"github.com/otaviovaladares/cachalot/internal/discovery"
 )
 
-var DefaultLockDuration = 120 * time.Second
-
 type Coordinator interface {
 	Connect() error
 	GetNodeID() string
 	Lock(key string) error
 	GetLocks() (map[string]string, error)
+}
+
+type ElectionConfig struct {
+	TimeToWaitForVotes time.Duration
+}
+
+type CoordinatorConfig struct {
+	DefaultLockDuration time.Duration
+	DiscoveryProvider   string
+	ElectionConfig      *ElectionConfig
 }
 
 type LocalCoordinator struct {
@@ -23,17 +31,25 @@ type LocalCoordinator struct {
 	seedNodes      []string
 	lockManager    LockManager
 	clusterManager discovery.ClusterManager
+	conf           *CoordinatorConfig
 }
 
-func NewLocalCoordinator(logg *slog.Logger, bindAddr string, seedNodes []string) *LocalCoordinator {
-	discovery := discovery.NewSerfDiscover(bindAddr, seedNodes, logg)
+func NewLocalCoordinator(logg *slog.Logger, bindAddr string, seedNodes []string, conf *CoordinatorConfig) *LocalCoordinator {
+	discovery, err := discoveryProviderFactory(conf.DiscoveryProvider, bindAddr, seedNodes, logg)
+
+	if err != nil {
+		logg.Error("failed to create discovery provider", "error", err)
+
+		panic(err)
+	}
 
 	return &LocalCoordinator{
 		logg:           logg,
 		bindAddr:       bindAddr,
 		seedNodes:      seedNodes,
 		clusterManager: discovery,
-		lockManager:    NewLocalLockManager(discovery),
+		lockManager:    NewLocalLockManager(discovery, conf.DefaultLockDuration),
+		conf:           conf,
 	}
 }
 
@@ -44,7 +60,7 @@ func (c *LocalCoordinator) Connect() error { //Maybe return a Node instance?
 	}
 	c.logg.Debug("Cluster manager connected", "node_id", c.clusterManager.GetNodeID())
 
-	electionManager := NewElectionManager(c.GetNodeID(), c.logg, c.lockManager, c.clusterManager)
+	electionManager := NewElectionManager(c.GetNodeID(), c.logg, c.lockManager, c.clusterManager, c.conf.ElectionConfig)
 	eventHandler := NewServiceDiscoveryEventHandler(c.lockManager, electionManager, c.GetNodeID(), c.logg)
 
 	c.clusterManager.RegisterEventHandler(eventHandler.Handle)
@@ -57,7 +73,7 @@ func (c *LocalCoordinator) GetNodeID() string {
 }
 
 func (c *LocalCoordinator) Lock(key string) error {
-	ch, err := c.lockManager.AcquireLock(key, c.GetNodeID(), DefaultLockDuration)
+	ch, err := c.lockManager.AcquireLock(key, c.GetNodeID(), c.conf.DefaultLockDuration)
 
 	if err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
@@ -70,7 +86,7 @@ func (c *LocalCoordinator) Lock(key string) error {
 		}
 
 		c.logg.Debug("Lock acquired", "key", key, "node_id", nodeID)
-	case <-time.After(DefaultLockDuration):
+	case <-time.After(c.conf.DefaultLockDuration):
 		return fmt.Errorf("lock acquisition timed out")
 	}
 
@@ -85,4 +101,13 @@ func (c *LocalCoordinator) GetLocks() (map[string]string, error) {
 	}
 
 	return locks, nil
+}
+
+func discoveryProviderFactory(provider string, bindAddr string, seedNodes []string, logg *slog.Logger) (discovery.ClusterManager, error) {
+	switch provider {
+	case "serf":
+		return discovery.NewSerfDiscover(bindAddr, seedNodes, logg), nil
+	default:
+		return discovery.NewSerfDiscover(bindAddr, seedNodes, logg), nil
+	}
 }

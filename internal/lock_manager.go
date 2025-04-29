@@ -19,18 +19,20 @@ type LockManager interface {
 }
 
 type LocalLockManager struct {
-	lockRespsWaiting map[string]chan string
-	lockMap          *TTLLockMap
-	clusterManager   discovery.ClusterManager
+	lockRespsWaiting    map[string]chan string
+	lockMap             *TTLLockMap
+	clusterManager      discovery.ClusterManager
+	defaultLockDuration time.Duration //TODO make this come directly as Set parameter
 
 	mu sync.RWMutex
 }
 
-func NewLocalLockManager(clusterManager discovery.ClusterManager) *LocalLockManager {
+func NewLocalLockManager(clusterManager discovery.ClusterManager, lockDuration time.Duration) *LocalLockManager {
 	return &LocalLockManager{
-		lockRespsWaiting: make(map[string]chan string),
-		lockMap:          NewTTLLockMap(),
-		clusterManager:   clusterManager,
+		lockRespsWaiting:    make(map[string]chan string),
+		lockMap:             NewTTLLockMap(),
+		clusterManager:      clusterManager,
+		defaultLockDuration: lockDuration,
 	}
 }
 
@@ -63,7 +65,7 @@ func (lm *LocalLockManager) IsLocked(key string) bool {
 }
 
 func (lm *LocalLockManager) SetLock(key, nodeID string) bool {
-	return lm.lockMap.Acquire(nodeID, key, DefaultLockDuration)
+	return lm.lockMap.Acquire(nodeID, key, lm.defaultLockDuration)
 }
 
 func (lm *LocalLockManager) PendingLock(key string) (chan string, bool) {
