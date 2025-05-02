@@ -5,7 +5,7 @@ import (
 	"log/slog"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/discovery"
 )
 
 type Coordinator interface {

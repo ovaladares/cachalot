@@ -9,7 +9,7 @@ import (
 	"time"
 
 	"github.com/otaviovaladares/cachalot/internal"
-	"github.com/otaviovaladares/cachalot/internal/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/discovery"
 	"github.com/stretchr/testify/assert"
 )
 

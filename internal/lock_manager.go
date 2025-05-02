@@ -6,7 +6,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/discovery"
 )
 
 type LockManager interface {

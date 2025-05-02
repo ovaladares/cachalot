@@ -4,7 +4,7 @@ import (
 	"encoding/json"
 	"log/slog"
 
-	"github.com/otaviovaladares/cachalot/internal/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/discovery"
 )
 
 type Event struct {

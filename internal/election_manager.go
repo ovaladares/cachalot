@@ -9,7 +9,7 @@ import (
 	"sync"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/discovery"
 )
 
 // ElectionManager defines the interface for managing distributed elections
