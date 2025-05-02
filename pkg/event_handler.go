@@ -105,6 +105,8 @@ func (h *ServiceDiscoveryEventHandler) handleAcquireLockEvent(cEvent *discovery.
 
 	ok := h.lockManager.SetLock(lock.Key, lock.NodeID)
 
+	h.lockManager.DeletePendingLock(lock.Key)
+
 	if !ok {
 		return
 	}

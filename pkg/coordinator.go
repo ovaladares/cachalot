@@ -81,7 +81,11 @@ func (c *LocalCoordinator) Lock(key string) error {
 	}
 
 	select {
-	case nodeID := <-ch:
+	case nodeID, ok := <-ch:
+		if !ok {
+			return fmt.Errorf("Lock acquired by another node")
+		}
+
 		if nodeID != c.GetNodeID() {
 			return fmt.Errorf("lock already acquired by another node")
 		}
