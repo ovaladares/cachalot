@@ -1,11 +1,12 @@
-package internal
+package cachalot
 
 import (
 	"fmt"
 	"log/slog"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
 type Coordinator interface {
@@ -29,7 +30,7 @@ type LocalCoordinator struct {
 	logg           *slog.Logger
 	bindAddr       string
 	seedNodes      []string
-	lockManager    LockManager
+	lockManager    storage.LockManager
 	clusterManager discovery.ClusterManager
 	conf           *CoordinatorConfig
 }
@@ -48,7 +49,7 @@ func NewLocalCoordinator(logg *slog.Logger, bindAddr string, seedNodes []string,
 		bindAddr:       bindAddr,
 		seedNodes:      seedNodes,
 		clusterManager: discovery,
-		lockManager:    NewLocalLockManager(discovery, conf.DefaultLockDuration),
+		lockManager:    storage.NewLocalLockManager(discovery, conf.DefaultLockDuration),
 		conf:           conf,
 	}
 }

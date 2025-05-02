@@ -1,11 +1,9 @@
 package cachalot
 
-import (
-	"github.com/otaviovaladares/cachalot/internal"
-)
+import cachalot "github.com/otaviovaladares/cachalot/pkg"
 
 type Coordinator struct {
-	internal internal.Coordinator
+	internal cachalot.Coordinator
 }
 
 func NewCoordinator(bindAddr string, seedNodes []string, config *Config) *Coordinator {
@@ -13,14 +11,14 @@ func NewCoordinator(bindAddr string, seedNodes []string, config *Config) *Coordi
 
 	conf.Logger.Debug("Creating new local coordinator")
 
-	localCoordinator := internal.NewLocalCoordinator(
+	localCoordinator := cachalot.NewLocalCoordinator(
 		conf.Logger,
 		bindAddr,
 		seedNodes,
-		&internal.CoordinatorConfig{
+		&cachalot.CoordinatorConfig{
 			DefaultLockDuration: conf.DefaultLockDuration,
 			DiscoveryProvider:   conf.DiscoveryBackend,
-			ElectionConfig: &internal.ElectionConfig{
+			ElectionConfig: &cachalot.ElectionConfig{
 				TimeToWaitForVotes: conf.ElectionConfig.TimeToWaitForVotes,
 			},
 		},

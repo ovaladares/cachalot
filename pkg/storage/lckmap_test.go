@@ -1,15 +1,15 @@
-package internal_test
+package storage_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal"
+	"github.com/otaviovaladares/cachalot/pkg/storage"
 	"github.com/stretchr/testify/assert"
 )
 
 func TestTTLLockMap_AcquireSucess(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	node := "node1"
 	key := "value1"
@@ -26,7 +26,7 @@ func TestTTLLockMap_AcquireSucess(t *testing.T) {
 }
 
 func TestTTLLockMap_AcquireFailAlreadyExists(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	node := "node1"
 	key := "value1"
@@ -46,7 +46,7 @@ func TestTTLLockMap_AcquireFailAlreadyExists(t *testing.T) {
 }
 
 func TestTTLLockMap_RenewSuccess(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	node := "node1"
 	key := "value1"
@@ -66,7 +66,7 @@ func TestTTLLockMap_RenewSuccess(t *testing.T) {
 }
 
 func TestTTLLockMap_RenewDontExists(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	duration := 1 * time.Second
 
@@ -75,7 +75,7 @@ func TestTTLLockMap_RenewDontExists(t *testing.T) {
 }
 
 func TestTTLLockMap_RenewLockSchedule(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	node := "node1"
 	key := "value1"
@@ -96,7 +96,7 @@ func TestTTLLockMap_RenewLockSchedule(t *testing.T) {
 }
 
 func TestTTLLockMap_ReleaseSuccess(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	node := "node1"
 	key := "value1"
@@ -112,14 +112,14 @@ func TestTTLLockMap_ReleaseSuccess(t *testing.T) {
 }
 
 func TestTTLLockMap_ReleaseDontExists(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	released := m.Release("non-existing-key")
 	assert.False(t, released)
 }
 
 func TestTTLLockMap_Locks(t *testing.T) {
-	m := internal.NewTTLLockMap()
+	m := storage.NewTTLLockMap()
 
 	node := "node1"
 	key := "value1"
