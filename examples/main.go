@@ -89,6 +89,7 @@ func main() {
 					err := coordinator.Lock("example-key")
 					if err != nil {
 						fmt.Printf("Failed to acquire lock: %v\n", err)
+						return
 					} else {
 						fmt.Println("Successfully acquired lock!")
 						lockAcquired <- true
