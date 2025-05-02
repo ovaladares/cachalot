@@ -1,11 +1,11 @@
-package internal_test
+package storage_test
 
 import (
 	"testing"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal"
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/storage"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -51,7 +51,7 @@ func (m *MockClusterManager) RegisterEventHandler(handler func(*discovery.Cluste
 }
 
 func TestLockManagerIsLocked_Success(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	node := "node1"
 	key := "value1"
@@ -63,14 +63,14 @@ func TestLockManagerIsLocked_Success(t *testing.T) {
 }
 
 func TestLockManagerIsLocked_NoLock(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	key := "value1"
 
 	assert.False(t, m.IsLocked(key))
 }
 func TestLockManagerSetLock_Success(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	node := "node1"
 	key := "value1"
@@ -86,7 +86,7 @@ func TestLockManagerSetLock_Success(t *testing.T) {
 }
 
 func TestLockManagerSetLock_AlreadyLocked(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	node1 := "node1"
 	node2 := "node2"
@@ -106,7 +106,7 @@ func TestLockManagerSetLock_AlreadyLocked(t *testing.T) {
 }
 
 func TestLockManagerGetLocks_Succes(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	node1 := "node1"
 	node2 := "node2"
@@ -128,7 +128,7 @@ func TestLockManagerGetLocks_Succes(t *testing.T) {
 }
 
 func TestLockManagerAcquireLock_Sucess(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	ch, err := m.AcquireLock("value1", "node1", 10*time.Second)
 
@@ -141,7 +141,7 @@ func TestLockManagerAcquireLock_Sucess(t *testing.T) {
 }
 
 func TestLockManagerAcquireLock_BroadcastEventError(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{
+	m := storage.NewLocalLockManager(&MockClusterManager{
 		BroadcastEventErr: assert.AnError,
 	}, 10*time.Second)
 
@@ -156,7 +156,7 @@ func TestLockManagerAcquireLock_BroadcastEventError(t *testing.T) {
 }
 
 func TestLockManagerDeletePendingLock_Success(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	ch, err := m.AcquireLock("value1", "node1", 10*time.Second)
 
@@ -171,7 +171,7 @@ func TestLockManagerDeletePendingLock_Success(t *testing.T) {
 }
 
 func TestLockManagerDeletePendingLock_NoPendingLock(t *testing.T) {
-	m := internal.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
+	m := storage.NewLocalLockManager(&MockClusterManager{}, 10*time.Second)
 
 	m.DeletePendingLock("value1")
 

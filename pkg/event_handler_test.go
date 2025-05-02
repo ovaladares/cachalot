@@ -1,4 +1,4 @@
-package internal_test
+package cachalot_test
 
 import (
 	"encoding/json"
@@ -8,32 +8,34 @@ import (
 	"testing"
 	"time"
 
-	"github.com/otaviovaladares/cachalot/internal"
+	cachalot "github.com/otaviovaladares/cachalot/pkg"
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/domain"
+	"github.com/otaviovaladares/cachalot/pkg/storage"
 	"github.com/stretchr/testify/assert"
 )
 
 type MockElectionManager struct {
-	ClaimKeyCalledWith      []*internal.Event
-	HandleKeyVoteCalledWith []*internal.Event
+	ClaimKeyCalledWith      []*domain.Event
+	HandleKeyVoteCalledWith []*domain.Event
 	HandleKeyVoteErr        error
 }
 
-func (m *MockElectionManager) ClaimKey(event *internal.Event) {
+func (m *MockElectionManager) ClaimKey(event *domain.Event) {
 	m.ClaimKeyCalledWith = append(m.ClaimKeyCalledWith, event)
 }
 
-func (m *MockElectionManager) HandleKeyVote(event *internal.Event) error {
+func (m *MockElectionManager) HandleKeyVote(event *domain.Event) error {
 	m.HandleKeyVoteCalledWith = append(m.HandleKeyVoteCalledWith, event)
 
 	return nil
 }
 
-func (m *MockElectionManager) VoteForKey(_ *internal.Event) error {
+func (m *MockElectionManager) VoteForKey(_ *domain.Event) error {
 	panic("implement me")
 }
 
-func (m *MockElectionManager) AcquireLock(_ *internal.Lock) error {
+func (m *MockElectionManager) AcquireLock(_ *storage.Lock) error {
 	panic("implement me")
 }
 
@@ -87,7 +89,7 @@ func (m *MockLockManager) DeletePendingLock(key string) {
 }
 
 func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
-	lockEvent := &internal.Lock{
+	lockEvent := &storage.Lock{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
@@ -102,10 +104,10 @@ func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := internal.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
-		Type: internal.LockAcquiredEventName,
+		Type: domain.LockAcquiredEventName,
 		Body: b,
 	})
 
@@ -115,7 +117,7 @@ func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
 }
 
 func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
-	lockEvent := &internal.Lock{
+	lockEvent := &storage.Lock{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
@@ -134,10 +136,10 @@ func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := internal.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
-		Type: internal.LockAcquiredEventName,
+		Type: domain.LockAcquiredEventName,
 		Body: b,
 	})
 
@@ -146,7 +148,7 @@ func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
 }
 
 func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
-	voteEvent := &internal.Event{
+	voteEvent := &domain.Event{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
@@ -161,10 +163,10 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := internal.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
-		Type: internal.VoteForKeyEventName,
+		Type: domain.VoteForKeyEventName,
 		Body: b,
 	})
 
@@ -173,7 +175,7 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 }
 
 func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
-	claimEvent := &internal.Event{
+	claimEvent := &domain.Event{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
@@ -188,10 +190,10 @@ func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := internal.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
-		Type: internal.ClaimKeyEventName,
+		Type: domain.ClaimKeyEventName,
 		Body: b,
 	})
 

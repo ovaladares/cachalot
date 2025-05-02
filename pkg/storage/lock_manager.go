@@ -1,4 +1,4 @@
-package internal
+package storage
 
 import (
 	"encoding/json"
@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/domain"
 )
 
 type LockManager interface {
@@ -37,7 +38,7 @@ func NewLocalLockManager(clusterManager discovery.ClusterManager, lockDuration t
 }
 
 func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (chan string, error) { //TODO make duration work
-	event := Event{
+	event := domain.Event{
 		Key:    key,
 		NodeID: nodeID,
 	}
@@ -48,7 +49,7 @@ func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (ch
 		return nil, fmt.Errorf("failed to marshal event: %w", err)
 	}
 
-	err = lm.clusterManager.BroadcastEvent(ClaimKeyEventName, b)
+	err = lm.clusterManager.BroadcastEvent(domain.ClaimKeyEventName, b)
 
 	if err != nil {
 		return nil, fmt.Errorf("failed to send user event: %w", err)

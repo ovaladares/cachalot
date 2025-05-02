@@ -1,31 +1,23 @@
-package internal
+package cachalot
 
 import (
 	"encoding/json"
 	"log/slog"
 
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/domain"
+	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
-type Event struct {
-	Key    string `json:"key"`
-	NodeID string `json:"node-id"`
-	Round  int    `json:"round"`
-}
-
-const ClaimKeyEventName = "claim-key"
-const VoteForKeyEventName = "vote-for-key"
-const LockAcquiredEventName = "lock-acquired"
-
 type ServiceDiscoveryEventHandler struct {
-	lockManager     LockManager
+	lockManager     storage.LockManager
 	electionManager ElectionManager
 	nodeName        string
 	logg            *slog.Logger
 }
 
 func NewServiceDiscoveryEventHandler(
-	lockManager LockManager,
+	lockManager storage.LockManager,
 	electionManager ElectionManager,
 	nodeName string,
 	logg *slog.Logger,
@@ -52,11 +44,11 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 		h.handleMemberLeave(event)
 	case discovery.MemberFailedEventType:
 		h.handleMemberFailed(event)
-	case ClaimKeyEventName:
+	case domain.ClaimKeyEventName:
 		h.handleClaimEvent(event)
-	case VoteForKeyEventName:
+	case domain.VoteForKeyEventName:
 		h.handleVoteForKeyEvent(event)
-	case LockAcquiredEventName:
+	case domain.LockAcquiredEventName:
 		h.handleAcquireLockEvent(event)
 	default:
 		h.logg.Warn("unknown event type", "type", event.Type)
@@ -64,7 +56,7 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 }
 
 func (h *ServiceDiscoveryEventHandler) handleClaimEvent(cEvent *discovery.ClusterEvent) {
-	var event Event
+	var event domain.Event
 
 	err := json.Unmarshal(cEvent.Body, &event)
 
@@ -78,7 +70,7 @@ func (h *ServiceDiscoveryEventHandler) handleClaimEvent(cEvent *discovery.Cluste
 }
 
 func (h *ServiceDiscoveryEventHandler) handleVoteForKeyEvent(cEvent *discovery.ClusterEvent) {
-	var event Event
+	var event domain.Event
 
 	err := json.Unmarshal(cEvent.Body, &event)
 
@@ -95,7 +87,7 @@ func (h *ServiceDiscoveryEventHandler) handleVoteForKeyEvent(cEvent *discovery.C
 }
 
 func (h *ServiceDiscoveryEventHandler) handleAcquireLockEvent(cEvent *discovery.ClusterEvent) {
-	var lock Lock
+	var lock storage.Lock
 
 	err := json.Unmarshal(cEvent.Body, &lock)
 	if err != nil {
