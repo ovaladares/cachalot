@@ -125,7 +125,7 @@ func TestTTLLockMap_Locks(t *testing.T) {
 	key := "value1"
 	node2 := "node2"
 	key2 := "value2"
-	duration := 60 * time.Second
+	duration := 120 * time.Second
 
 	ok := m.Acquire(node, key, duration)
 	assert.True(t, ok)
@@ -137,6 +137,7 @@ func TestTTLLockMap_Locks(t *testing.T) {
 	assert.Len(t, locks, 2)
 	assert.Equal(t, key, locks[0].Key)
 	assert.Equal(t, node, locks[0].NodeID)
+
 	assert.Equal(t, key2, locks[1].Key)
 	assert.Equal(t, node2, locks[1].NodeID)
 }
