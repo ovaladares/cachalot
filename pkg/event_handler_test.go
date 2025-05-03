@@ -45,7 +45,10 @@ func (m *MockElectionManager) DeleteProposal(_ string) {
 
 type MockLockManager struct {
 	locks map[string]string
-	mutex sync.RWMutex
+	mu    sync.RWMutex
+
+	DeletePendingLockCalledWith []string
+	DeletePendingLockCallCount  int
 }
 
 func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration) (chan string, error) {
@@ -57,8 +60,8 @@ func (m *MockLockManager) GetLocks() (map[string]string, error) {
 }
 
 func (m *MockLockManager) IsLocked(key string) bool {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	if m.locks == nil {
 		return false
@@ -69,8 +72,8 @@ func (m *MockLockManager) IsLocked(key string) bool {
 }
 
 func (m *MockLockManager) SetLock(key, nodeID string) bool {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if m.locks == nil {
 		m.locks = make(map[string]string)
@@ -80,12 +83,28 @@ func (m *MockLockManager) SetLock(key, nodeID string) bool {
 	return true
 }
 
+func (m *MockLockManager) RenewLock(key string, durationMs int64) error {
+	panic("implement me")
+}
+
+func (m *MockLockManager) Renew(key string, duration time.Duration) error {
+	panic("implement me")
+}
+
 func (m *MockLockManager) PendingLock(key string) (chan string, bool) {
 	panic("implement me")
 }
 
 func (m *MockLockManager) DeletePendingLock(key string) {
-	panic("implement me")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.locks == nil {
+		return
+	}
+
+	m.DeletePendingLockCalledWith = append(m.DeletePendingLockCalledWith, key)
+	m.DeletePendingLockCallCount++
 }
 
 func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
@@ -114,6 +133,8 @@ func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
 	assert.True(t, lockManager.IsLocked(lockEvent.Key), "expected lock to be acquired")
 	assert.Equal(t, lockEvent.NodeID, lockManager.locks[lockEvent.Key], "expected lock to be acquired by the correct node")
 	assert.Equal(t, 1, len(lockManager.locks), "expected one lock to be acquired")
+	assert.Equal(t, 1, lockManager.DeletePendingLockCallCount, "expected DeletePendingLock to be called once")
+	assert.Equal(t, lockEvent.Key, lockManager.DeletePendingLockCalledWith[0], "expected DeletePendingLock to be called with the correct key")
 }
 
 func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {

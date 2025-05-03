@@ -50,17 +50,19 @@ func TestTTLLockMap_RenewSuccess(t *testing.T) {
 
 	node := "node1"
 	key := "value1"
-	duration := 1 * time.Second
+	duration := 10 * time.Second
 
 	ok := m.Acquire(node, key, duration)
 	assert.True(t, ok)
 
-	renewed := m.Renew(key, duration*4)
+	time.Sleep(5 * time.Second)
+
+	renewed := m.Renew(key, 10*time.Second)
 	assert.True(t, renewed)
 
 	assert.True(t, m.IsLocked(key))
 
-	time.Sleep(duration + 30*time.Millisecond)
+	time.Sleep(time.Second * 5)
 
 	assert.True(t, m.IsLocked(key))
 }

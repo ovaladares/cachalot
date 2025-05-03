@@ -1,6 +1,7 @@
 package storage
 
 import (
+	"fmt"
 	"sync"
 	"time"
 )
@@ -30,14 +31,21 @@ func (m *TTLLockMap) Renew(key string, duration time.Duration) bool {
 
 	if lockItem, exists := m.locks[key]; exists {
 		lockItem.timer.Stop()
-		lockItem.timer = time.AfterFunc(duration, func() {
+		delete(m.locks, key)
+
+		timer := time.AfterFunc(duration, func() {
 			m.mu.Lock()
 			defer m.mu.Unlock()
-
 			delete(m.locks, key)
 		})
 
-		lockItem.duration = duration
+		m.locks[key] = &Lock{
+			Key:       key,
+			NodeID:    lockItem.NodeID,
+			timer:     timer,
+			duration:  duration,
+			createdAt: lockItem.createdAt,
+		}
 
 		return true
 	}
@@ -106,4 +114,17 @@ func (m *TTLLockMap) Locks() []Lock {
 	}
 
 	return locks
+}
+
+func (m *TTLLockMap) GetLock(key string) (*Lock, error) {
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	lck, ok := m.locks[key]
+
+	if !ok {
+		return nil, fmt.Errorf("lock not found")
+	}
+
+	return lck, nil
 }

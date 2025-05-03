@@ -89,6 +89,21 @@ func main() {
 					err := coordinator.Lock("example-key")
 					if err != nil {
 						fmt.Printf("Failed to acquire lock: %v\n", err)
+
+						go func() {
+							time.Sleep(25 * time.Second)
+
+							fmt.Println("Renewing lock that was not acquired... 120 seconds")
+
+							err := coordinator.Renew("example-key", 120*time.Second)
+
+							if err != nil {
+								fmt.Printf("Failed to renew lock: %v\n", err)
+							} else {
+								fmt.Println("Successfully renewed lock!")
+							}
+						}()
+
 						return
 					} else {
 						fmt.Println("Successfully acquired lock!")
@@ -114,6 +129,21 @@ func main() {
 	select {
 	case <-lockAcquired:
 		fmt.Println("Lock has been acquired. Press Ctrl+C to exit...")
+
+		go func() {
+			time.Sleep(45 * time.Second)
+
+			fmt.Println("Renewing lock... 120 seconds")
+
+			err := coordinator.Renew("example-key", 120*time.Second)
+
+			if err != nil {
+				fmt.Printf("Failed to renew lock: %v\n", err)
+			} else {
+				fmt.Println("Successfully renewed lock!")
+			}
+		}()
+
 		<-sigChan
 	case sig := <-sigChan:
 		fmt.Printf("Received signal %v, shutting down...\n", sig)

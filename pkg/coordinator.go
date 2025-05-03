@@ -13,6 +13,7 @@ type Coordinator interface {
 	Connect() error
 	GetNodeID() string
 	Lock(key string) error
+	Renew(key string, duration time.Duration) error
 	GetLocks() (map[string]string, error)
 }
 
@@ -95,6 +96,17 @@ func (c *LocalCoordinator) Lock(key string) error {
 		return fmt.Errorf("lock acquisition timed out")
 	}
 
+	return nil
+}
+
+func (c *LocalCoordinator) Renew(key string, duration time.Duration) error {
+	err := c.lockManager.Renew(key, duration)
+
+	if err != nil {
+		return fmt.Errorf("failed to renew lock: %w", err)
+	}
+
+	c.logg.Debug("Lock renewed", "key", key, "node_id", c.GetNodeID())
 	return nil
 }
 
