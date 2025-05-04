@@ -185,7 +185,9 @@ func TestLockManagerDeletePendingLock_NoPendingLock(t *testing.T) {
 }
 
 func TestLockManagerRenew_Success(t *testing.T) {
-	mockClusterManager := &MockClusterManager{}
+	mockClusterManager := &MockClusterManager{
+		NodeID: "node1",
+	}
 
 	m := storage.NewLocalLockManager(mockClusterManager, 10*time.Second)
 
