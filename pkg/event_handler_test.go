@@ -45,7 +45,12 @@ func (m *MockElectionManager) DeleteProposal(_ string) {
 
 type MockLockManager struct {
 	locks map[string]string
-	mutex sync.RWMutex
+	mu    sync.RWMutex
+
+	DeletePendingLockCalledWith []string
+	DeletePendingLockCallCount  int
+
+	RenewLockCalledWith []string
 }
 
 func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration) (chan string, error) {
@@ -57,8 +62,8 @@ func (m *MockLockManager) GetLocks() (map[string]string, error) {
 }
 
 func (m *MockLockManager) IsLocked(key string) bool {
-	m.mutex.RLock()
-	defer m.mutex.RUnlock()
+	m.mu.RLock()
+	defer m.mu.RUnlock()
 
 	if m.locks == nil {
 		return false
@@ -69,8 +74,8 @@ func (m *MockLockManager) IsLocked(key string) bool {
 }
 
 func (m *MockLockManager) SetLock(key, nodeID string) bool {
-	m.mutex.Lock()
-	defer m.mutex.Unlock()
+	m.mu.Lock()
+	defer m.mu.Unlock()
 
 	if m.locks == nil {
 		m.locks = make(map[string]string)
@@ -80,12 +85,37 @@ func (m *MockLockManager) SetLock(key, nodeID string) bool {
 	return true
 }
 
+func (m *MockLockManager) RenewLock(key string, durationMs int64) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.locks == nil {
+		m.locks = make(map[string]string)
+	}
+
+	m.RenewLockCalledWith = append(m.RenewLockCalledWith, key)
+
+	return nil
+}
+
+func (m *MockLockManager) Renew(key string, duration time.Duration) error {
+	panic("implement me")
+}
+
 func (m *MockLockManager) PendingLock(key string) (chan string, bool) {
 	panic("implement me")
 }
 
 func (m *MockLockManager) DeletePendingLock(key string) {
-	panic("implement me")
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	if m.locks == nil {
+		return
+	}
+
+	m.DeletePendingLockCalledWith = append(m.DeletePendingLockCalledWith, key)
+	m.DeletePendingLockCallCount++
 }
 
 func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
@@ -95,9 +125,7 @@ func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
 	}
 
 	b, err := json.Marshal(lockEvent)
-	if err != nil {
-		t.Fatalf("failed to marshal lock event: %v", err)
-	}
+	assert.NoError(t, err, "failed to marshal claim event")
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
@@ -113,7 +141,10 @@ func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
 
 	assert.True(t, lockManager.IsLocked(lockEvent.Key), "expected lock to be acquired")
 	assert.Equal(t, lockEvent.NodeID, lockManager.locks[lockEvent.Key], "expected lock to be acquired by the correct node")
-	assert.Equal(t, 1, len(lockManager.locks), "expected one lock to be acquired")
+	assert.Len(t, lockManager.locks, 1, "expected one lock to be acquired")
+
+	assert.Equal(t, 1, lockManager.DeletePendingLockCallCount, "expected DeletePendingLock to be called once")
+	assert.Equal(t, lockEvent.Key, lockManager.DeletePendingLockCalledWith[0], "expected DeletePendingLock to be called with the correct key")
 }
 
 func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
@@ -123,9 +154,7 @@ func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
 	}
 
 	b, err := json.Marshal(lockEvent)
-	if err != nil {
-		t.Fatalf("failed to marshal lock event: %v", err)
-	}
+	assert.NoError(t, err, "failed to marshal claim event")
 
 	lockManager := &MockLockManager{
 		locks: map[string]string{
@@ -154,9 +183,7 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 	}
 
 	b, err := json.Marshal(voteEvent)
-	if err != nil {
-		t.Fatalf("failed to marshal lock event: %v", err)
-	}
+	assert.NoError(t, err, "failed to marshal claim event")
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
@@ -170,7 +197,7 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 		Body: b,
 	})
 
-	assert.Equal(t, 1, len(electionManager.HandleKeyVoteCalledWith), "expected one vote event to be handled")
+	assert.Len(t, electionManager.HandleKeyVoteCalledWith, 1, "expected one vote event to be handled")
 	assert.Equal(t, voteEvent, electionManager.HandleKeyVoteCalledWith[0], "expected vote event to be handled")
 }
 
@@ -181,9 +208,7 @@ func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
 	}
 
 	b, err := json.Marshal(claimEvent)
-	if err != nil {
-		t.Fatalf("failed to marshal lock event: %v", err)
-	}
+	assert.NoError(t, err, "failed to marshal claim event")
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
@@ -197,6 +222,31 @@ func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
 		Body: b,
 	})
 
-	assert.Equal(t, 1, len(electionManager.ClaimKeyCalledWith), "expected one claim event to be handled")
+	assert.Len(t, electionManager.ClaimKeyCalledWith, 1, "expected one claim event to be handled")
 	assert.Equal(t, claimEvent, electionManager.ClaimKeyCalledWith[0], "expected claim event to be handled")
+}
+
+func TestEventHandlerHandle_RenewLockEvent(t *testing.T) {
+	renewEvent := &domain.Event{
+		Key:    "test-key",
+		NodeID: "test-node",
+	}
+
+	b, err := json.Marshal(renewEvent)
+	assert.NoError(t, err, "failed to marshal renew event")
+
+	lockManager := &MockLockManager{}
+	electionManager := &MockElectionManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+
+	eventHandler.Handle(&discovery.ClusterEvent{
+		Type: domain.RenewLockEventName,
+		Body: b,
+	})
+
+	assert.Len(t, lockManager.RenewLockCalledWith, 1, "expected renew to be called once")
+	assert.Equal(t, renewEvent.Key, lockManager.RenewLockCalledWith[0], "expected renew to be called with the correct key")
 }

@@ -50,6 +50,8 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 		h.handleVoteForKeyEvent(event)
 	case domain.LockAcquiredEventName:
 		h.handleAcquireLockEvent(event)
+	case domain.RenewLockEventName:
+		h.handleRenewLockEvent(event)
 	default:
 		h.logg.Warn("unknown event type", "type", event.Type)
 	}
@@ -112,6 +114,22 @@ func (h *ServiceDiscoveryEventHandler) handleAcquireLockEvent(cEvent *discovery.
 	}
 
 	h.logg.Info("Lock acquired", "key", lock.Key, "node-id", lock.NodeID)
+}
+
+func (h *ServiceDiscoveryEventHandler) handleRenewLockEvent(event *discovery.ClusterEvent) {
+	var renewEvent domain.RenewLockEvent
+
+	if err := json.Unmarshal(event.Body, &renewEvent); err != nil {
+		h.logg.Error("failed to unmarshal renew lock event", "error", err)
+
+		return
+	}
+
+	err := h.lockManager.RenewLock(renewEvent.Key, renewEvent.TimeMillis)
+
+	if err != nil {
+		h.logg.Error("failed to renew lock", "error", err)
+	}
 }
 
 func (h *ServiceDiscoveryEventHandler) handleMemberJoin(event *discovery.ClusterEvent) {

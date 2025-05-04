@@ -15,6 +15,8 @@ type LockManager interface {
 	GetLocks() (map[string]string, error)
 	IsLocked(key string) bool
 	SetLock(key, nodeID string) bool
+	RenewLock(key string, durationMs int64) error
+	Renew(key string, duration time.Duration) error
 	PendingLock(key string) (chan string, bool)
 	DeletePendingLock(key string)
 }
@@ -61,12 +63,60 @@ func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (ch
 	return respCh, nil
 }
 
+func (lm *LocalLockManager) Renew(key string, duration time.Duration) error {
+	if !lm.IsLocked(key) {
+		return fmt.Errorf("key %s is not locked", key)
+	}
+
+	lock, err := lm.lockMap.GetLock(key)
+
+	if err != nil {
+		return fmt.Errorf("failed to get lock: %w", err)
+	}
+
+	if lock.NodeID != lm.clusterManager.GetNodeID() {
+		return fmt.Errorf("lock is held by another node: %s", lock.NodeID)
+	}
+
+	lockEvent := &domain.RenewLockEvent{
+		Key:        key,
+		NodeID:     lock.NodeID,
+		TimeMillis: duration.Milliseconds(),
+	}
+
+	b, err := json.Marshal(lockEvent)
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	err = lm.clusterManager.BroadcastEvent(domain.RenewLockEventName, b)
+
+	if err != nil {
+		return fmt.Errorf("failed to send user event: %w", err)
+	}
+
+	return nil
+}
+
 func (lm *LocalLockManager) IsLocked(key string) bool {
 	return lm.lockMap.IsLocked(key)
 }
 
 func (lm *LocalLockManager) SetLock(key, nodeID string) bool {
 	return lm.lockMap.Acquire(nodeID, key, lm.defaultLockDuration)
+}
+
+func (lm *LocalLockManager) RenewLock(key string, durationMs int64) error {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	ok := lm.lockMap.Renew(key, time.Duration(durationMs)*time.Millisecond)
+
+	if !ok {
+		return fmt.Errorf("failed to renew lock")
+	}
+
+	return nil
 }
 
 func (lm *LocalLockManager) PendingLock(key string) (chan string, bool) {

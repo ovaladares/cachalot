@@ -1,6 +1,10 @@
 package cachalot
 
-import cachalot "github.com/otaviovaladares/cachalot/pkg"
+import (
+	"time"
+
+	cachalot "github.com/otaviovaladares/cachalot/pkg"
+)
 
 type Coordinator struct {
 	internal cachalot.Coordinator
@@ -41,6 +45,16 @@ func (c *Coordinator) Connect() error {
 
 func (c *Coordinator) Lock(key string) error {
 	err := c.internal.Lock(key)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (c *Coordinator) Renew(key string, duration time.Duration) error {
+	err := c.internal.Renew(key, duration)
 
 	if err != nil {
 		return err
