@@ -19,18 +19,6 @@ type ElectionManager interface {
 	ClaimKey(event *domain.Event)
 	HandleKeyVote(event *domain.Event) error
 	VoteForKey(event *domain.Event) error
-	AcquireLock(lock *storage.Lock) error
-	DeleteProposal(key string)
-}
-
-type LockProposal struct {
-	NodeID    string
-	Timestamp int64
-}
-
-type ElectionState struct {
-	Votes int
-	Round int
 }
 
 // DistributedElectionManager handles the distributed election process for locks
@@ -135,7 +123,7 @@ func (em *DistributedElectionManager) HandleKeyVote(event *domain.Event) error {
 				NodeID: em.nodeName,
 			}
 
-			err := em.AcquireLock(l)
+			err := em.acquireLock(l)
 
 			if err != nil {
 				return fmt.Errorf("failed to acquire lock: %w", err)
@@ -192,7 +180,7 @@ func (em *DistributedElectionManager) runElection(key string, round int) {
 		return
 	}
 
-	em.DeleteProposal(key)
+	em.deleteProposal(key)
 }
 
 // VoteForKey broadcasts a vote for a key
@@ -212,8 +200,8 @@ func (em *DistributedElectionManager) VoteForKey(event *domain.Event) error {
 	return nil
 }
 
-// AcquireLock acquires a lock after winning an election
-func (em *DistributedElectionManager) AcquireLock(lock *storage.Lock) error {
+// acquireLock acquires a lock after winning an election
+func (em *DistributedElectionManager) acquireLock(lock *storage.Lock) error {
 	l := &storage.Lock{
 		Key:    lock.Key,
 		NodeID: em.nodeName,
@@ -235,7 +223,7 @@ func (em *DistributedElectionManager) AcquireLock(lock *storage.Lock) error {
 }
 
 // DeleteProposal removes a proposal for a key
-func (em *DistributedElectionManager) DeleteProposal(key string) {
+func (em *DistributedElectionManager) deleteProposal(key string) {
 	em.mu.Lock()
 	defer em.mu.Unlock()
 
