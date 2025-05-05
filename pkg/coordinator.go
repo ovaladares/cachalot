@@ -6,6 +6,7 @@ import (
 	"time"
 
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
+	"github.com/otaviovaladares/cachalot/pkg/election"
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
@@ -15,10 +16,6 @@ type Coordinator interface {
 	Lock(key string) error
 	Renew(key string, duration time.Duration) error
 	GetLocks() (map[string]string, error)
-}
-
-type ElectionConfig struct {
-	TimeToWaitForVotes time.Duration
 }
 
 type CoordinatorConfig struct {
@@ -62,7 +59,7 @@ func (c *LocalCoordinator) Connect() error { //Maybe return a Node instance?
 	}
 	c.logg.Debug("Cluster manager connected", "node_id", c.clusterManager.GetNodeID())
 
-	electionManager := NewElectionManager(c.GetNodeID(), c.logg, c.lockManager, c.clusterManager, c.conf.ElectionConfig)
+	electionManager := NewElectionManager(c.GetNodeID(), c.logg, c.lockManager, c.clusterManager, election.NewStateManager(), c.conf.ElectionConfig)
 	eventHandler := NewServiceDiscoveryEventHandler(c.lockManager, electionManager, c.GetNodeID(), c.logg)
 
 	c.clusterManager.RegisterEventHandler(eventHandler.Handle)

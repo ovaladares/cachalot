@@ -15,6 +15,12 @@ import (
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+type ElectionConfig struct {
+	TimeToWaitForVotes time.Duration
+
+	ElectionFn func(key string, round int) error
+}
+
 // ElectionManager defines the interface for managing distributed elections
 type ElectionManager interface {
 	StartElection(event *domain.Event)
@@ -30,7 +36,7 @@ type DistributedElectionManager struct {
 	lockManager    storage.LockManager
 	stateManager   *election.StateManager
 	mu             sync.RWMutex
-	timeFn         func() time.Time
+	TimeFn         func() time.Time
 	conf           *ElectionConfig
 }
 
@@ -40,23 +46,24 @@ func NewElectionManager(
 	logg *slog.Logger,
 	lockManager storage.LockManager,
 	clusterManager discovery.ClusterManager,
+	stateManager *election.StateManager,
 	conf *ElectionConfig,
-) ElectionManager {
+) *DistributedElectionManager {
 	return &DistributedElectionManager{
 		nodeName:       nodeName,
 		logg:           logg,
 		clusterManager: clusterManager,
 		lockManager:    lockManager,
-		stateManager:   election.NewStateManager(),
+		stateManager:   stateManager,
 		mu:             sync.RWMutex{},
-		timeFn:         time.Now,
+		TimeFn:         time.Now,
 		conf:           conf,
 	}
 }
 
 // StartElection initiates an election for a key
 func (em *DistributedElectionManager) StartElection(event *domain.Event) {
-	timestamp := em.timeFn().UnixNano()
+	timestamp := em.TimeFn().UnixNano()
 	round := em.stateManager.AddProposal(event.Key, event.NodeID, timestamp)
 
 	go em.runElection(event.Key, round)
