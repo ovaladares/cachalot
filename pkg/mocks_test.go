@@ -10,17 +10,17 @@ import (
 )
 
 type MockElectionManager struct {
-	ClaimKeyCalledWith      []*domain.Event
-	HandleKeyVoteCalledWith []*domain.Event
-	HandleKeyVoteErr        error
+	StartElectionCalledWith []*domain.Event
+	HandleVoteCalledWith    []*domain.Event
+	HandleVoteErr           error
 }
 
-func (m *MockElectionManager) ClaimKey(event *domain.Event) {
-	m.ClaimKeyCalledWith = append(m.ClaimKeyCalledWith, event)
+func (m *MockElectionManager) StartElection(event *domain.Event) {
+	m.StartElectionCalledWith = append(m.StartElectionCalledWith, event)
 }
 
-func (m *MockElectionManager) HandleKeyVote(event *domain.Event) error {
-	m.HandleKeyVoteCalledWith = append(m.HandleKeyVoteCalledWith, event)
+func (m *MockElectionManager) HandleVote(event *domain.Event) error {
+	m.HandleVoteCalledWith = append(m.HandleVoteCalledWith, event)
 
 	return nil
 }

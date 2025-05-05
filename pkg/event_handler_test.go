@@ -92,8 +92,8 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 		Body: b,
 	})
 
-	assert.Len(t, electionManager.HandleKeyVoteCalledWith, 1, "expected one vote event to be handled")
-	assert.Equal(t, voteEvent, electionManager.HandleKeyVoteCalledWith[0], "expected vote event to be handled")
+	assert.Len(t, electionManager.HandleVoteCalledWith, 1, "expected one vote event to be handled")
+	assert.Equal(t, voteEvent, electionManager.HandleVoteCalledWith[0], "expected vote event to be handled")
 }
 
 func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
@@ -117,8 +117,8 @@ func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
 		Body: b,
 	})
 
-	assert.Len(t, electionManager.ClaimKeyCalledWith, 1, "expected one claim event to be handled")
-	assert.Equal(t, claimEvent, electionManager.ClaimKeyCalledWith[0], "expected claim event to be handled")
+	assert.Len(t, electionManager.StartElectionCalledWith, 1, "expected one claim event to be handled")
+	assert.Equal(t, claimEvent, electionManager.StartElectionCalledWith[0], "expected claim event to be handled")
 }
 
 func TestEventHandlerHandle_RenewLockEvent(t *testing.T) {

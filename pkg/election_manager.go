@@ -17,8 +17,8 @@ import (
 
 // ElectionManager defines the interface for managing distributed elections
 type ElectionManager interface {
-	ClaimKey(event *domain.Event)
-	HandleKeyVote(event *domain.Event) error
+	StartElection(event *domain.Event)
+	HandleVote(event *domain.Event) error
 	VoteForKey(event *domain.Event) error
 }
 
@@ -54,30 +54,16 @@ func NewElectionManager(
 	}
 }
 
-// ClaimKey initiates an election for a key
-func (em *DistributedElectionManager) ClaimKey(event *domain.Event) {
-	// if _, ok := em.proposalsByKey[event.Key]; !ok {
-	// 	em.proposalsByKey[event.Key] = make(map[string]*LockProposal)
-	// 	em.electionRounds[event.Key] = 1
-	// } else {
-	// 	em.electionRounds[event.Key]++
-	// }
-
-	// roundNum := em.electionRounds[event.Key]
-	// timestamp := em.timeFn().UnixNano()
-	// em.proposalsByKey[event.Key][event.NodeID] = &LockProposal{
-	// 	NodeID:    event.NodeID,
-	// 	Timestamp: timestamp,
-	// }
-
+// StartElection initiates an election for a key
+func (em *DistributedElectionManager) StartElection(event *domain.Event) {
 	timestamp := em.timeFn().UnixNano()
 	round := em.stateManager.AddProposal(event.Key, event.NodeID, timestamp)
 
 	go em.runElection(event.Key, round)
 }
 
-// HandleKeyVote processes a vote for a key
-func (em *DistributedElectionManager) HandleKeyVote(event *domain.Event) error {
+// HandleVote processes a vote for a key
+func (em *DistributedElectionManager) HandleVote(event *domain.Event) error {
 	if event.NodeID != em.nodeName {
 		em.logg.Debug("Ignoring vote for key event", "node_id", event.NodeID, "current_node_id", em.nodeName)
 		return nil
