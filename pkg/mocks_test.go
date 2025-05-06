@@ -45,6 +45,11 @@ type MockLockManager struct {
 	DeletePendingLockCallCount  int
 
 	RenewLockCalledWith []string
+
+	PendingLockCalledWith     []string
+	PendingLockCallCount      int
+	PendingLockResponse       chan string
+	PendingLockResponseExists bool
 }
 
 func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration) (chan string, error) {
@@ -97,7 +102,13 @@ func (m *MockLockManager) Renew(key string, duration time.Duration) error {
 }
 
 func (m *MockLockManager) PendingLock(key string) (chan string, bool) {
-	panic("implement me")
+	m.mu.RLock()
+	defer m.mu.RUnlock()
+
+	m.PendingLockCalledWith = append(m.PendingLockCalledWith, key)
+	m.PendingLockCallCount++
+
+	return m.PendingLockResponse, m.PendingLockResponseExists
 }
 
 func (m *MockLockManager) DeletePendingLock(key string) {
@@ -121,14 +132,31 @@ type MockClusterManager struct {
 	NodeID                   string
 	BroadcastEventCalledWith []BroadcastEventInput
 	BroadcastEventErr        error
+	GetMembersCallCount      int
+	GetMembersResponse       []*discovery.Member
+	GetMembersErr            error
+
+	GetMembersCountCallCount int
+	GetMembersCountResponse  int
+	GetMembersCountErr       error
 }
 
 func (m *MockClusterManager) GetMembers() ([]*discovery.Member, error) {
-	return nil, nil
+	m.GetMembersCallCount++
+	if m.GetMembersErr != nil {
+		return nil, m.GetMembersErr
+	}
+
+	return m.GetMembersResponse, nil
 }
 
 func (m *MockClusterManager) GetMembersCount() (int, error) {
-	return 0, nil
+	m.GetMembersCountCallCount++
+	if m.GetMembersCountErr != nil {
+		return 0, m.GetMembersCountErr
+	}
+
+	return m.GetMembersCountResponse, nil
 }
 
 func (m *MockClusterManager) Connect() error {

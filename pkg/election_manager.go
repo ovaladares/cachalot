@@ -90,8 +90,6 @@ func (em *DistributedElectionManager) HandleVote(event *domain.Event) error {
 
 	if votes >= majority {
 		if ch, ok := em.lockManager.PendingLock(event.Key); ok {
-			em.logg.Info("Lock acquired through majority vote", "key", event.Key)
-
 			isLocked := em.lockManager.IsLocked(event.Key)
 			if isLocked {
 				em.logg.Error("Lock already acquired", "msg", "Lock already acquired by another node, unable to acquire lock after majority vote", "key", event.Key, "node-id", em.nodeName)
@@ -112,6 +110,8 @@ func (em *DistributedElectionManager) HandleVote(event *domain.Event) error {
 			if err != nil {
 				return fmt.Errorf("failed to acquire lock: %w", err)
 			}
+
+			em.logg.Info("Lock acquired through majority vote", "key", event.Key)
 		}
 	}
 
