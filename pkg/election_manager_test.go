@@ -11,6 +11,7 @@ import (
 	cachalot "github.com/otaviovaladares/cachalot/pkg"
 	"github.com/otaviovaladares/cachalot/pkg/domain"
 	"github.com/otaviovaladares/cachalot/pkg/election"
+	"github.com/otaviovaladares/cachalot/pkg/storage"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -352,4 +353,117 @@ func TestElectionManagerHandleVote_NoPendingLock(t *testing.T) {
 
 	assert.Len(t, clusterManager.BroadcastEventCalledWith, 0, "should not have called broadcast event")
 	assert.Equal(t, 0, lockManager.DeletePendingLockCallCount, "should not have called DeletePendingLock")
+}
+
+func TestElectionManagerHandleVote_PendingLockButItsLocked(t *testing.T) {
+	nodeName := "node1"
+	pendingLockCh := make(chan string)
+
+	lockManager := &MockLockManager{
+		PendingLockResponseExists: true,
+		PendingLockResponse:       pendingLockCh,
+	}
+
+	clusterManager := &MockClusterManager{
+		GetMembersCountResponse: 1,
+	}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	stateManager := election.NewStateManager()
+
+	em := cachalot.NewElectionManager(
+		nodeName,
+		logg,
+		lockManager,
+		clusterManager,
+		stateManager,
+		&cachalot.ElectionConfig{
+			TimeToWaitForVotes: 5 * time.Second,
+		},
+	)
+
+	eventKey := "test-key"
+
+	event := &domain.Event{
+		Key:    eventKey,
+		NodeID: nodeName,
+	}
+
+	lockManager.SetLock(eventKey, nodeName)
+
+	resp := em.HandleVote(event)
+
+	assert.Error(t, resp, "should have returned an error")
+	assert.Equal(t, 1, clusterManager.GetMembersCountCallCount, "should have called GetMembersCount once")
+
+	assert.Len(t, lockManager.PendingLockCalledWith, 1, "should have called PendingLock")
+	assert.Equal(t, lockManager.PendingLockCalledWith[0], eventKey, "should have called PendingLock with the correct key")
+
+	assert.Len(t, clusterManager.BroadcastEventCalledWith, 0, "should not have called broadcast event")
+	assert.Equal(t, 0, lockManager.DeletePendingLockCallCount, "should not have called DeletePendingLock")
+}
+
+func TestElectionManagerHandleVote_SuccessMajority(t *testing.T) {
+	nodeName := "node1"
+	pendingLockCh := make(chan string, 1)
+
+	lockManager := &MockLockManager{
+		PendingLockResponseExists: true,
+		PendingLockResponse:       pendingLockCh,
+	}
+
+	clusterManager := &MockClusterManager{
+		GetMembersCountResponse: 1,
+	}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	stateManager := election.NewStateManager()
+
+	em := cachalot.NewElectionManager(
+		nodeName,
+		logg,
+		lockManager,
+		clusterManager,
+		stateManager,
+		&cachalot.ElectionConfig{
+			TimeToWaitForVotes: 5 * time.Second,
+		},
+	)
+
+	eventKey := "test-key"
+
+	event := &domain.Event{
+		Key:    eventKey,
+		NodeID: nodeName,
+	}
+
+	resp := em.HandleVote(event)
+
+	receivedEvent := <-pendingLockCh
+
+	assert.Nil(t, resp, "should not return an error")
+	assert.Equal(t, 1, clusterManager.GetMembersCountCallCount, "should have called GetMembersCount once")
+
+	assert.Len(t, lockManager.PendingLockCalledWith, 1, "should have called PendingLock")
+	assert.Equal(t, lockManager.PendingLockCalledWith[0], eventKey, "should have called PendingLock with the correct key")
+
+	assert.Equal(t, nodeName, receivedEvent, "should have sent the correct node ID to the channel")
+
+	assert.Equal(t, 1, lockManager.DeletePendingLockCallCount, "should have called DeletePendingLock")
+	assert.Equal(t, eventKey, lockManager.DeletePendingLockCalledWith[0], "should have called DeletePendingLock with right paramters")
+
+	assert.Len(t, clusterManager.BroadcastEventCalledWith, 1, "should have called broadcast event")
+
+	assert.Equal(t, domain.LockAcquiredEventName, clusterManager.BroadcastEventCalledWith[0].EventName)
+
+	var broadcastedEvent storage.Lock
+	err := json.Unmarshal(clusterManager.BroadcastEventCalledWith[0].Data, &broadcastedEvent)
+
+	assert.NoError(t, err)
+
+	assert.Equal(t, eventKey, broadcastedEvent.Key, "broadcasted lock event with right key")
+	assert.Equal(t, nodeName, broadcastedEvent.NodeID, "broadcasted lock event with right node name")
+
 }

@@ -115,12 +115,12 @@ func (m *MockLockManager) DeletePendingLock(key string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
 
+	m.DeletePendingLockCalledWith = append(m.DeletePendingLockCalledWith, key)
+	m.DeletePendingLockCallCount++
+
 	if m.locks == nil {
 		return
 	}
-
-	m.DeletePendingLockCalledWith = append(m.DeletePendingLockCalledWith, key)
-	m.DeletePendingLockCallCount++
 }
 
 type BroadcastEventInput struct {
