@@ -68,7 +68,7 @@ func (h *ServiceDiscoveryEventHandler) handleClaimEvent(cEvent *discovery.Cluste
 		return
 	}
 
-	h.electionManager.ClaimKey(&event)
+	h.electionManager.StartElection(&event)
 }
 
 func (h *ServiceDiscoveryEventHandler) handleVoteForKeyEvent(cEvent *discovery.ClusterEvent) {
@@ -81,7 +81,7 @@ func (h *ServiceDiscoveryEventHandler) handleVoteForKeyEvent(cEvent *discovery.C
 		return
 	}
 
-	err = h.electionManager.HandleKeyVote(&event)
+	err = h.electionManager.HandleVote(&event)
 	if err != nil {
 		h.logg.Error("Failed to handle vote event", "error", err)
 		return

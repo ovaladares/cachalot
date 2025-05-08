@@ -11,39 +11,32 @@ import (
 
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
 	"github.com/otaviovaladares/cachalot/pkg/domain"
+	"github.com/otaviovaladares/cachalot/pkg/election"
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+type ElectionConfig struct {
+	TimeToWaitForVotes time.Duration
+
+	ElectionFn func(key string, round int) error
+}
+
 // ElectionManager defines the interface for managing distributed elections
 type ElectionManager interface {
-	ClaimKey(event *domain.Event)
-	HandleKeyVote(event *domain.Event) error
+	StartElection(event *domain.Event)
+	HandleVote(event *domain.Event) error
 	VoteForKey(event *domain.Event) error
-	AcquireLock(lock *storage.Lock) error
-	DeleteProposal(key string)
-}
-
-type LockProposal struct {
-	NodeID    string
-	Timestamp int64
-}
-
-type ElectionState struct {
-	Votes int
-	Round int
 }
 
 // DistributedElectionManager handles the distributed election process for locks
 type DistributedElectionManager struct {
 	nodeName       string
 	logg           *slog.Logger
-	proposalsByKey map[string]map[string]*LockProposal
-	electionRounds map[string]int
-	electionsState map[string]*ElectionState
 	clusterManager discovery.ClusterManager
 	lockManager    storage.LockManager
+	stateManager   *election.StateManager
 	mu             sync.RWMutex
-	timeFn         func() time.Time
+	TimeFn         func() time.Time
 	conf           *ElectionConfig
 }
 
@@ -53,58 +46,37 @@ func NewElectionManager(
 	logg *slog.Logger,
 	lockManager storage.LockManager,
 	clusterManager discovery.ClusterManager,
+	stateManager *election.StateManager,
 	conf *ElectionConfig,
-) ElectionManager {
+) *DistributedElectionManager {
 	return &DistributedElectionManager{
 		nodeName:       nodeName,
 		logg:           logg,
 		clusterManager: clusterManager,
 		lockManager:    lockManager,
-		proposalsByKey: make(map[string]map[string]*LockProposal),
-		electionRounds: make(map[string]int),
-		electionsState: make(map[string]*ElectionState),
+		stateManager:   stateManager,
 		mu:             sync.RWMutex{},
-		timeFn:         time.Now,
+		TimeFn:         time.Now,
 		conf:           conf,
 	}
 }
 
-// ClaimKey initiates an election for a key
-func (em *DistributedElectionManager) ClaimKey(event *domain.Event) {
-	if _, ok := em.proposalsByKey[event.Key]; !ok {
-		em.proposalsByKey[event.Key] = make(map[string]*LockProposal)
-		em.electionRounds[event.Key] = 1
-	} else {
-		em.electionRounds[event.Key]++
-	}
+// StartElection initiates an election for a key
+func (em *DistributedElectionManager) StartElection(event *domain.Event) {
+	timestamp := em.TimeFn().UnixNano()
+	round := em.stateManager.AddProposal(event.Key, event.NodeID, timestamp)
 
-	roundNum := em.electionRounds[event.Key]
-	timestamp := em.timeFn().UnixNano()
-	em.proposalsByKey[event.Key][event.NodeID] = &LockProposal{
-		NodeID:    event.NodeID,
-		Timestamp: timestamp,
-	}
-
-	go em.runElection(event.Key, roundNum)
+	go em.runElection(event.Key, round)
 }
 
-// HandleKeyVote processes a vote for a key
-func (em *DistributedElectionManager) HandleKeyVote(event *domain.Event) error {
+// HandleVote processes a vote for a key
+func (em *DistributedElectionManager) HandleVote(event *domain.Event) error {
 	if event.NodeID != em.nodeName {
 		em.logg.Debug("Ignoring vote for key event", "node_id", event.NodeID, "current_node_id", em.nodeName)
 		return nil
 	}
 
-	electionState, ok := em.electionsState[event.Key]
-	if !ok || electionState.Round != event.Round {
-		electionState = &ElectionState{
-			Votes: 0,
-			Round: event.Round,
-		}
-		em.electionsState[event.Key] = electionState
-	}
-
-	electionState.Votes++
+	votes, _ := em.stateManager.RecordVote(event.Key, event.Round)
 
 	nodesCount, err := em.clusterManager.GetMembersCount()
 
@@ -116,10 +88,8 @@ func (em *DistributedElectionManager) HandleKeyVote(event *domain.Event) error {
 
 	majority := nodesCount/2 + 1
 
-	if electionState.Votes >= majority {
+	if votes >= majority {
 		if ch, ok := em.lockManager.PendingLock(event.Key); ok {
-			em.logg.Info("Lock acquired through majority vote", "key", event.Key)
-
 			isLocked := em.lockManager.IsLocked(event.Key)
 			if isLocked {
 				em.logg.Error("Lock already acquired", "msg", "Lock already acquired by another node, unable to acquire lock after majority vote", "key", event.Key, "node-id", em.nodeName)
@@ -135,11 +105,13 @@ func (em *DistributedElectionManager) HandleKeyVote(event *domain.Event) error {
 				NodeID: em.nodeName,
 			}
 
-			err := em.AcquireLock(l)
+			err := em.acquireLock(l)
 
 			if err != nil {
 				return fmt.Errorf("failed to acquire lock: %w", err)
 			}
+
+			em.logg.Info("Lock acquired through majority vote", "key", event.Key)
 		}
 	}
 
@@ -152,14 +124,38 @@ func (em *DistributedElectionManager) runElection(key string, round int) {
 	// This should be tuned based on network characteristics
 	time.Sleep(em.conf.TimeToWaitForVotes)
 
-	if em.electionRounds[key] != round {
+	if !em.stateManager.IsValidRound(key, round) {
 		return
 	}
 
-	var winningProposal *LockProposal
+	proposals := em.stateManager.GetProposals(key)
+	if proposals == nil {
+		em.logg.Debug("No proposals found for key", "key", key)
+		return
+	}
+
+	winningNodeID := em.determineWinner(proposals)
+
+	e := domain.Event{
+		Key:    key,
+		NodeID: winningNodeID,
+		Round:  round,
+	}
+
+	err := em.VoteForKey(&e)
+
+	if err != nil {
+		em.logg.Error("Failed to vote for key", "error", err)
+		return
+	}
+
+	em.stateManager.DeleteProposals(key)
+}
+
+func (em *DistributedElectionManager) determineWinner(proposals map[string]*election.LockProposal) string {
+	var winningProposal *election.LockProposal
 	var winningNodeID string
 
-	proposals := em.proposalsByKey[key]
 	for nodeID, proposal := range proposals {
 		if winningProposal == nil {
 			winningProposal = proposal
@@ -179,23 +175,9 @@ func (em *DistributedElectionManager) runElection(key string, round int) {
 		}
 	}
 
-	e := domain.Event{
-		Key:    key,
-		NodeID: winningNodeID,
-		Round:  round,
-	}
-
-	err := em.VoteForKey(&e)
-
-	if err != nil {
-		em.logg.Error("Failed to vote for key", "error", err)
-		return
-	}
-
-	em.DeleteProposal(key)
+	return winningNodeID
 }
 
-// VoteForKey broadcasts a vote for a key
 func (em *DistributedElectionManager) VoteForKey(event *domain.Event) error {
 	b, err := json.Marshal(event)
 
@@ -212,8 +194,8 @@ func (em *DistributedElectionManager) VoteForKey(event *domain.Event) error {
 	return nil
 }
 
-// AcquireLock acquires a lock after winning an election
-func (em *DistributedElectionManager) AcquireLock(lock *storage.Lock) error {
+// acquireLock acquires a lock after winning an election
+func (em *DistributedElectionManager) acquireLock(lock *storage.Lock) error {
 	l := &storage.Lock{
 		Key:    lock.Key,
 		NodeID: em.nodeName,
@@ -232,12 +214,4 @@ func (em *DistributedElectionManager) AcquireLock(lock *storage.Lock) error {
 	}
 
 	return nil
-}
-
-// DeleteProposal removes a proposal for a key
-func (em *DistributedElectionManager) DeleteProposal(key string) {
-	em.mu.Lock()
-	defer em.mu.Unlock()
-
-	delete(em.proposalsByKey, key)
 }
