@@ -52,6 +52,8 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 		h.handleAcquireLockEvent(event)
 	case domain.RenewLockEventName:
 		h.handleRenewLockEvent(event)
+	case domain.ReleaseLockEventName:
+		h.handleReleaseLockEvent(event)
 	default:
 		h.logg.Warn("unknown event type", "type", event.Type)
 	}
@@ -129,6 +131,22 @@ func (h *ServiceDiscoveryEventHandler) handleRenewLockEvent(event *discovery.Clu
 
 	if err != nil {
 		h.logg.Error("failed to renew lock", "error", err)
+	}
+}
+
+func (h *ServiceDiscoveryEventHandler) handleReleaseLockEvent(event *discovery.ClusterEvent) {
+	var releaseEvent domain.ReleaseLockEvent
+
+	if err := json.Unmarshal(event.Body, &releaseEvent); err != nil {
+		h.logg.Error("failed to unmarshal release lock event", "error", err)
+
+		return
+	}
+
+	err := h.lockManager.ReleaseLock(releaseEvent.Key)
+
+	if err != nil {
+		h.logg.Error("failed to release lock", "error", err)
 	}
 }
 

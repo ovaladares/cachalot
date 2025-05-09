@@ -63,6 +63,16 @@ func (c *Coordinator) Renew(key string, duration time.Duration) error {
 	return nil
 }
 
+func (c *Coordinator) Release(key string) error {
+	err := c.internal.Release(key)
+
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
 func (c *Coordinator) GetLocks() (map[string]string, error) {
 	locks, err := c.internal.GetLocks()
 

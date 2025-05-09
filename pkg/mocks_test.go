@@ -50,6 +50,10 @@ type MockLockManager struct {
 	PendingLockCallCount      int
 	PendingLockResponse       chan string
 	PendingLockResponseExists bool
+
+	ReleaseLockCallCount  int
+	ReleaseLockCalledWith []string
+	ReleaseLockErr        error
 }
 
 func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration) (chan string, error) {
@@ -98,6 +102,23 @@ func (m *MockLockManager) RenewLock(key string, durationMs int64) error {
 }
 
 func (m *MockLockManager) Renew(key string, duration time.Duration) error {
+	panic("implement me")
+}
+
+func (m *MockLockManager) ReleaseLock(key string) error {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.ReleaseLockCallCount++
+	m.ReleaseLockCalledWith = append(m.ReleaseLockCalledWith, key)
+	if m.ReleaseLockErr != nil {
+		return m.ReleaseLockErr
+	}
+
+	return nil
+}
+
+func (m *MockLockManager) Release(key string) error {
 	panic("implement me")
 }
 

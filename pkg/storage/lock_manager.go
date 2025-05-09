@@ -17,6 +17,8 @@ type LockManager interface {
 	SetLock(key, nodeID string) bool
 	RenewLock(key string, durationMs int64) error
 	Renew(key string, duration time.Duration) error
+	Release(key string) error
+	ReleaseLock(key string) error
 	PendingLock(key string) (chan string, bool)
 	DeletePendingLock(key string)
 }
@@ -98,6 +100,41 @@ func (lm *LocalLockManager) Renew(key string, duration time.Duration) error {
 	return nil
 }
 
+func (lm *LocalLockManager) Release(key string) error {
+	if !lm.IsLocked(key) {
+		return fmt.Errorf("key %s is not locked", key)
+	}
+
+	lock, err := lm.lockMap.GetLock(key)
+
+	if err != nil {
+		return fmt.Errorf("failed to get lock: %w", err)
+	}
+
+	if lock.NodeID != lm.clusterManager.GetNodeID() {
+		return fmt.Errorf("lock is held by another node: %s", lock.NodeID)
+	}
+
+	lockEvent := &domain.ReleaseLockEvent{
+		Key:    key,
+		NodeID: lock.NodeID,
+	}
+
+	b, err := json.Marshal(lockEvent)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	err = lm.clusterManager.BroadcastEvent(domain.ReleaseLockEventName, b)
+
+	if err != nil {
+		return fmt.Errorf("failed to send release lock event: %w", err)
+	}
+
+	return nil
+}
+
 func (lm *LocalLockManager) IsLocked(key string) bool {
 	return lm.lockMap.IsLocked(key)
 }
@@ -114,6 +151,19 @@ func (lm *LocalLockManager) RenewLock(key string, durationMs int64) error {
 
 	if !ok {
 		return fmt.Errorf("failed to renew lock")
+	}
+
+	return nil
+}
+
+func (lm *LocalLockManager) ReleaseLock(key string) error {
+	lm.mu.Lock()
+	defer lm.mu.Unlock()
+
+	delete(lm.lockRespsWaiting, key)
+
+	if ok := lm.lockMap.Release(key); !ok {
+		return fmt.Errorf("failed to release lock: %s", key)
 	}
 
 	return nil
