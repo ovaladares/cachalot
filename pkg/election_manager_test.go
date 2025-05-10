@@ -125,6 +125,9 @@ func TestElectionManagerStartElection_SuccessOneProposal(t *testing.T) {
 
 	time.Sleep(6 * time.Second)
 
+	clusterManager.Mu.Lock()
+	defer clusterManager.Mu.Unlock()
+
 	assert.Len(t, clusterManager.BroadcastEventCalledWith, 1, "have called broadcast event")
 
 	broadcastedEvent := clusterManager.BroadcastEventCalledWith[0]

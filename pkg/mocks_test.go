@@ -13,13 +13,21 @@ type MockElectionManager struct {
 	StartElectionCalledWith []*domain.Event
 	HandleVoteCalledWith    []*domain.Event
 	HandleVoteErr           error
+
+	Mu sync.RWMutex
 }
 
 func (m *MockElectionManager) StartElection(event *domain.Event) {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
 	m.StartElectionCalledWith = append(m.StartElectionCalledWith, event)
 }
 
 func (m *MockElectionManager) HandleVote(event *domain.Event) error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
 	m.HandleVoteCalledWith = append(m.HandleVoteCalledWith, event)
 
 	return nil
@@ -39,7 +47,7 @@ func (m *MockElectionManager) DeleteProposal(_ string) {
 
 type MockLockManager struct {
 	locks map[string]string
-	mu    sync.RWMutex
+	Mu    sync.RWMutex
 
 	DeletePendingLockCalledWith []string
 	DeletePendingLockCallCount  int
@@ -65,8 +73,8 @@ func (m *MockLockManager) GetLocks() (map[string]string, error) {
 }
 
 func (m *MockLockManager) IsLocked(key string) bool {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.Mu.RLock()
+	defer m.Mu.RUnlock()
 
 	if m.locks == nil {
 		return false
@@ -77,8 +85,8 @@ func (m *MockLockManager) IsLocked(key string) bool {
 }
 
 func (m *MockLockManager) SetLock(key, nodeID string) bool {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
 
 	if m.locks == nil {
 		m.locks = make(map[string]string)
@@ -89,8 +97,8 @@ func (m *MockLockManager) SetLock(key, nodeID string) bool {
 }
 
 func (m *MockLockManager) RenewLock(key string, durationMs int64) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
 
 	if m.locks == nil {
 		m.locks = make(map[string]string)
@@ -106,8 +114,8 @@ func (m *MockLockManager) Renew(key string, duration time.Duration) error {
 }
 
 func (m *MockLockManager) ReleaseLock(key string) error {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
 
 	m.ReleaseLockCallCount++
 	m.ReleaseLockCalledWith = append(m.ReleaseLockCalledWith, key)
@@ -123,8 +131,8 @@ func (m *MockLockManager) Release(key string) error {
 }
 
 func (m *MockLockManager) PendingLock(key string) (chan string, bool) {
-	m.mu.RLock()
-	defer m.mu.RUnlock()
+	m.Mu.RLock()
+	defer m.Mu.RUnlock()
 
 	m.PendingLockCalledWith = append(m.PendingLockCalledWith, key)
 	m.PendingLockCallCount++
@@ -133,8 +141,8 @@ func (m *MockLockManager) PendingLock(key string) (chan string, bool) {
 }
 
 func (m *MockLockManager) DeletePendingLock(key string) {
-	m.mu.Lock()
-	defer m.mu.Unlock()
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
 
 	m.DeletePendingLockCalledWith = append(m.DeletePendingLockCalledWith, key)
 	m.DeletePendingLockCallCount++
@@ -160,9 +168,14 @@ type MockClusterManager struct {
 	GetMembersCountCallCount int
 	GetMembersCountResponse  int
 	GetMembersCountErr       error
+
+	Mu sync.Mutex
 }
 
 func (m *MockClusterManager) GetMembers() ([]*discovery.Member, error) {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
 	m.GetMembersCallCount++
 	if m.GetMembersErr != nil {
 		return nil, m.GetMembersErr
@@ -172,6 +185,9 @@ func (m *MockClusterManager) GetMembers() ([]*discovery.Member, error) {
 }
 
 func (m *MockClusterManager) GetMembersCount() (int, error) {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
 	m.GetMembersCountCallCount++
 	if m.GetMembersCountErr != nil {
 		return 0, m.GetMembersCountErr
@@ -187,10 +203,16 @@ func (m *MockClusterManager) Disconnect() error {
 	return nil
 }
 func (m *MockClusterManager) GetNodeID() string {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
 	return m.NodeID
 }
 
 func (m *MockClusterManager) BroadcastEvent(event string, data []byte) error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
 	m.BroadcastEventCalledWith = append(m.BroadcastEventCalledWith, BroadcastEventInput{
 		EventName: event,
 		Data:      data,
