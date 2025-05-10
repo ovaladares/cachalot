@@ -15,6 +15,7 @@ type Coordinator interface {
 	GetNodeID() string
 	Lock(key string) error
 	Renew(key string, duration time.Duration) error
+	Release(key string) error
 	GetLocks() (map[string]string, error)
 }
 
@@ -104,6 +105,17 @@ func (c *LocalCoordinator) Renew(key string, duration time.Duration) error {
 	}
 
 	c.logg.Debug("Lock renewed", "key", key, "node_id", c.GetNodeID())
+	return nil
+}
+
+func (c *LocalCoordinator) Release(key string) error {
+	err := c.lockManager.Release(key)
+
+	if err != nil {
+		return fmt.Errorf("failed to release lock: %w", err)
+	}
+
+	c.logg.Debug("Lock released", "key", key, "node_id", c.GetNodeID())
 	return nil
 }
 

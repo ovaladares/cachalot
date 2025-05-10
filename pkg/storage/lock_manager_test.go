@@ -303,3 +303,98 @@ func TestLockManagerRenewLock_Success(t *testing.T) {
 	assert.Equal(t, 1, len(locks))
 	assert.Equal(t, node, locks[key])
 }
+
+func TestLockManagerRelease_ErrorNotLockOwner(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID: "node1",
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager, 10*time.Second)
+
+	node := "node2"
+	key := "value1"
+
+	ok := m.SetLock(key, node)
+	assert.True(t, ok)
+
+	err := m.Release(key)
+	assert.Error(t, err, "lock is held by another node error")
+	assert.Equal(t, 0, len(mockClusterManager.BroadcastEventCalledWith), "no event should be sent")
+}
+
+func TestLockManagerRelease_ErrorNotLocked(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID: "node1",
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager, 10*time.Second)
+
+	err := m.Release("value1")
+	assert.Error(t, err, "lock doesn't exist")
+	assert.Equal(t, 0, len(mockClusterManager.BroadcastEventCalledWith), "no event should be sent")
+}
+func TestLockManagerRelease_Success(t *testing.T) {
+	nodeID := "node1"
+	key := "value1"
+
+	mockClusterManager := &MockClusterManager{
+		NodeID: nodeID,
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager, 10*time.Second)
+
+	ok := m.SetLock(key, nodeID)
+	assert.True(t, ok)
+
+	err := m.Release(key)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(mockClusterManager.BroadcastEventCalledWith), "release event should be sent")
+
+	var releaseLockEvent domain.ReleaseLockEvent
+	err = json.Unmarshal(mockClusterManager.BroadcastEventCalledWith[0].Data, &releaseLockEvent)
+	assert.NoError(t, err)
+
+	assert.Equal(t, domain.ReleaseLockEventName, mockClusterManager.BroadcastEventCalledWith[0].EventName)
+	assert.Equal(t, key, releaseLockEvent.Key)
+	assert.Equal(t, nodeID, releaseLockEvent.NodeID)
+}
+
+func TestLockManagerReleaseLock_Success(t *testing.T) {
+	nodeID := "node1"
+	key := "value1"
+
+	mockClusterManager := &MockClusterManager{
+		NodeID: nodeID,
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager, 10*time.Second)
+
+	ok := m.SetLock(key, nodeID)
+	assert.True(t, ok)
+
+	err := m.ReleaseLock(key)
+	assert.NoError(t, err)
+
+	locks, err := m.GetLocks()
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(locks), "lock should not exists")
+}
+
+func TestLockManagerReleaseLock_ErrorLockDoesntExist(t *testing.T) {
+	nodeID := "node1"
+	key := "value1"
+
+	mockClusterManager := &MockClusterManager{
+		NodeID: nodeID,
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager, 10*time.Second)
+
+	ok := m.SetLock(key, nodeID)
+	assert.True(t, ok)
+
+	err := m.ReleaseLock("node2")
+	assert.Error(t, err)
+}

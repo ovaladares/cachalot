@@ -12,7 +12,13 @@ type RenewLockEvent struct {
 	TimeMillis int64  `json:"time-millis"`
 }
 
+type ReleaseLockEvent struct {
+	Key    string `json:"key"`
+	NodeID string `json:"node-id"`
+}
+
 const ClaimKeyEventName = "claim-key"
 const VoteForKeyEventName = "vote-for-key"
 const LockAcquiredEventName = "lock-acquired"
 const RenewLockEventName = "renew-lock"
+const ReleaseLockEventName = "release-lock"

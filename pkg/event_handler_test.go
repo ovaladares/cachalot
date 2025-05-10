@@ -145,3 +145,28 @@ func TestEventHandlerHandle_RenewLockEvent(t *testing.T) {
 	assert.Len(t, lockManager.RenewLockCalledWith, 1, "expected renew to be called once")
 	assert.Equal(t, renewEvent.Key, lockManager.RenewLockCalledWith[0], "expected renew to be called with the correct key")
 }
+
+func TestEventHandlerHandle_ReleaseLockEvent(t *testing.T) {
+	releaseEvent := &domain.ReleaseLockEvent{
+		Key:    "test-key",
+		NodeID: "test-node",
+	}
+
+	b, err := json.Marshal(releaseEvent)
+	assert.NoError(t, err, "failed to marshal release event")
+
+	lockManager := &MockLockManager{}
+	electionManager := &MockElectionManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+
+	eventHandler.Handle(&discovery.ClusterEvent{
+		Type: domain.ReleaseLockEventName,
+		Body: b,
+	})
+
+	assert.Len(t, lockManager.ReleaseLockCalledWith, 1, "expected release to be called once")
+	assert.Equal(t, releaseEvent.Key, lockManager.ReleaseLockCalledWith[0], "expected release to be called with the correct key")
+}
