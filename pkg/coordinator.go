@@ -48,7 +48,7 @@ func NewLocalCoordinator(logg *slog.Logger, bindAddr string, seedNodes []string,
 		bindAddr:       bindAddr,
 		seedNodes:      seedNodes,
 		clusterManager: discovery,
-		lockManager:    storage.NewLocalLockManager(discovery, conf.DefaultLockDuration),
+		lockManager:    storage.NewLocalLockManager(discovery),
 		conf:           conf,
 	}
 }

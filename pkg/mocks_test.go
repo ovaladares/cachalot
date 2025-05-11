@@ -84,7 +84,7 @@ func (m *MockLockManager) IsLocked(key string) bool {
 	return exists
 }
 
-func (m *MockLockManager) SetLock(key, nodeID string) bool {
+func (m *MockLockManager) SetLock(key, nodeID string, _ time.Duration) bool {
 	m.Mu.Lock()
 	defer m.Mu.Unlock()
 

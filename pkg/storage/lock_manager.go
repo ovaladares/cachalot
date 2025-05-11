@@ -24,20 +24,18 @@ type LockManager interface {
 }
 
 type LocalLockManager struct {
-	lockRespsWaiting    map[string]chan string
-	lockMap             *TTLLockMap
-	clusterManager      discovery.ClusterManager
-	defaultLockDuration time.Duration //TODO make this come directly as Set parameter
+	lockRespsWaiting map[string]chan string
+	lockMap          *TTLLockMap
+	clusterManager   discovery.ClusterManager
 
 	mu sync.RWMutex
 }
 
-func NewLocalLockManager(clusterManager discovery.ClusterManager, lockDuration time.Duration) *LocalLockManager {
+func NewLocalLockManager(clusterManager discovery.ClusterManager) *LocalLockManager {
 	return &LocalLockManager{
-		lockRespsWaiting:    make(map[string]chan string),
-		lockMap:             NewTTLLockMap(),
-		clusterManager:      clusterManager,
-		defaultLockDuration: lockDuration,
+		lockRespsWaiting: make(map[string]chan string),
+		lockMap:          NewTTLLockMap(),
+		clusterManager:   clusterManager,
 	}
 }
 

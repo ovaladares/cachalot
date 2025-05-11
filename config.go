@@ -17,9 +17,8 @@ type ElectionConfig struct {
 }
 
 var defaultConfig = &Config{
-	Logger:              slog.Default(),
-	DefaultLockDuration: 120 * time.Second,
-	DiscoveryBackend:    "serf",
+	Logger:           slog.Default(),
+	DiscoveryBackend: "serf",
 	ElectionConfig: &ElectionConfig{
 		TimeToWaitForVotes: 2 * time.Second,
 	},
@@ -32,10 +31,6 @@ func NewConfig(userConf *Config) *Config {
 
 	if userConf.Logger == nil {
 		userConf.Logger = defaultConfig.Logger
-	}
-
-	if userConf.DefaultLockDuration == 0 {
-		userConf.DefaultLockDuration = defaultConfig.DefaultLockDuration
 	}
 
 	if userConf.DiscoveryBackend == "" {
