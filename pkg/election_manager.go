@@ -23,9 +23,9 @@ type ElectionConfig struct {
 
 // ElectionManager defines the interface for managing distributed elections
 type ElectionManager interface {
-	StartElection(event *domain.Event)
-	HandleVote(event *domain.Event) error
-	VoteForKey(event *domain.Event) error
+	StartElection(event *domain.ClaimKeyEvent)
+	HandleVote(event *domain.VoteForKeyEvent) error
+	VoteForKey(string, string, int) error
 }
 
 // DistributedElectionManager handles the distributed election process for locks
@@ -62,7 +62,7 @@ func NewElectionManager(
 }
 
 // StartElection initiates an election for a key
-func (em *DistributedElectionManager) StartElection(event *domain.Event) {
+func (em *DistributedElectionManager) StartElection(event *domain.ClaimKeyEvent) {
 	timestamp := em.TimeFn().UnixNano()
 	round := em.stateManager.AddProposal(event.Key, event.NodeID, timestamp)
 
@@ -70,7 +70,7 @@ func (em *DistributedElectionManager) StartElection(event *domain.Event) {
 }
 
 // HandleVote processes a vote for a key
-func (em *DistributedElectionManager) HandleVote(event *domain.Event) error {
+func (em *DistributedElectionManager) HandleVote(event *domain.VoteForKeyEvent) error {
 	if event.NodeID != em.nodeName {
 		em.logg.Debug("Ignoring vote for key event", "node_id", event.NodeID, "current_node_id", em.nodeName)
 		return nil
@@ -100,9 +100,10 @@ func (em *DistributedElectionManager) HandleVote(event *domain.Event) error {
 
 			em.lockManager.DeletePendingLock(event.Key)
 
-			l := &storage.Lock{
-				Key:    event.Key,
-				NodeID: em.nodeName,
+			l := &domain.AcquireLockEvent{
+				Key:        event.Key,
+				NodeID:     em.nodeName,
+				TimeMillis: event.TimeMillis,
 			}
 
 			err := em.acquireLock(l)
@@ -136,13 +137,7 @@ func (em *DistributedElectionManager) runElection(key string, round int) {
 
 	winningNodeID := em.determineWinner(proposals)
 
-	e := domain.Event{
-		Key:    key,
-		NodeID: winningNodeID,
-		Round:  round,
-	}
-
-	err := em.VoteForKey(&e)
+	err := em.VoteForKey(key, winningNodeID, round)
 
 	if err != nil {
 		em.logg.Error("Failed to vote for key", "error", err)
@@ -178,7 +173,13 @@ func (em *DistributedElectionManager) determineWinner(proposals map[string]*elec
 	return winningNodeID
 }
 
-func (em *DistributedElectionManager) VoteForKey(event *domain.Event) error {
+func (em *DistributedElectionManager) VoteForKey(key, nodeID string, round int) error {
+	event := domain.VoteForKeyEvent{
+		Key:    key,
+		NodeID: nodeID,
+		Round:  round,
+	}
+
 	b, err := json.Marshal(event)
 
 	if err != nil {
@@ -195,13 +196,8 @@ func (em *DistributedElectionManager) VoteForKey(event *domain.Event) error {
 }
 
 // acquireLock acquires a lock after winning an election
-func (em *DistributedElectionManager) acquireLock(lock *storage.Lock) error {
-	l := &storage.Lock{
-		Key:    lock.Key,
-		NodeID: em.nodeName,
-	}
-
-	b, err := json.Marshal(l)
+func (em *DistributedElectionManager) acquireLock(acquireLockEvent *domain.AcquireLockEvent) error {
+	b, err := json.Marshal(acquireLockEvent)
 
 	if err != nil {
 		return fmt.Errorf("failed to marshal acquire lock event: %w", err)

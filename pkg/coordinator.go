@@ -13,7 +13,7 @@ import (
 type Coordinator interface {
 	Connect() error
 	GetNodeID() string
-	Lock(key string) error
+	Lock(key string, duration time.Duration) error
 	Renew(key string, duration time.Duration) error
 	Release(key string) error
 	GetLocks() (map[string]string, error)
@@ -72,8 +72,8 @@ func (c *LocalCoordinator) GetNodeID() string {
 	return c.clusterManager.GetNodeID()
 }
 
-func (c *LocalCoordinator) Lock(key string) error {
-	ch, err := c.lockManager.AcquireLock(key, c.GetNodeID(), c.conf.DefaultLockDuration)
+func (c *LocalCoordinator) Lock(key string, duration time.Duration) error {
+	ch, err := c.lockManager.AcquireLock(key, c.GetNodeID(), duration)
 
 	if err != nil {
 		return fmt.Errorf("failed to acquire lock: %w", err)
