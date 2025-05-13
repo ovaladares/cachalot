@@ -10,21 +10,21 @@ import (
 )
 
 type MockElectionManager struct {
-	StartElectionCalledWith []*domain.Event
-	HandleVoteCalledWith    []*domain.Event
+	StartElectionCalledWith []*domain.ClaimKeyEvent
+	HandleVoteCalledWith    []*domain.VoteForKeyEvent
 	HandleVoteErr           error
 
 	Mu sync.RWMutex
 }
 
-func (m *MockElectionManager) StartElection(event *domain.Event) {
+func (m *MockElectionManager) StartElection(event *domain.ClaimKeyEvent) {
 	m.Mu.Lock()
 	defer m.Mu.Unlock()
 
 	m.StartElectionCalledWith = append(m.StartElectionCalledWith, event)
 }
 
-func (m *MockElectionManager) HandleVote(event *domain.Event) error {
+func (m *MockElectionManager) HandleVote(event *domain.VoteForKeyEvent) error {
 	m.Mu.Lock()
 	defer m.Mu.Unlock()
 
@@ -33,7 +33,7 @@ func (m *MockElectionManager) HandleVote(event *domain.Event) error {
 	return nil
 }
 
-func (m *MockElectionManager) VoteForKey(_ *domain.Event) error {
+func (m *MockElectionManager) VoteForKey(_, _ string, _ int) error {
 	panic("implement me")
 }
 
