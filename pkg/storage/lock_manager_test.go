@@ -89,6 +89,29 @@ func TestLockManagerSetLock_Success(t *testing.T) {
 	assert.Equal(t, node, locks[key])
 }
 
+func TestLockManagerSetLock_SuccessRightTime(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 2*time.Second)
+	assert.True(t, ok)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(locks))
+	assert.Equal(t, node, locks[key])
+
+	time.Sleep(3 * time.Second)
+
+	locks, err = m.GetLocks()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(locks), "lock should not exists")
+	assert.False(t, m.IsLocked(key), "lock should not exists")
+}
+
 func TestLockManagerSetLock_AlreadyLocked(t *testing.T) {
 	m := storage.NewLocalLockManager(&MockClusterManager{})
 
@@ -132,12 +155,24 @@ func TestLockManagerGetLocks_Succes(t *testing.T) {
 }
 
 func TestLockManagerAcquireLock_Sucess(t *testing.T) {
-	m := storage.NewLocalLockManager(&MockClusterManager{})
+	clusterManager := &MockClusterManager{}
+
+	m := storage.NewLocalLockManager(clusterManager)
 
 	ch, err := m.AcquireLock("value1", "node1", 10*time.Second)
 
 	assert.NoError(t, err)
 	assert.NotNil(t, ch)
+
+	assert.Equal(t, 1, len(clusterManager.BroadcastEventCalledWith))
+
+	var eventSent domain.AcquireLockEvent
+	err = json.Unmarshal(clusterManager.BroadcastEventCalledWith[0].Data, &eventSent)
+	assert.NoError(t, err)
+	assert.Equal(t, domain.ClaimKeyEventName, clusterManager.BroadcastEventCalledWith[0].EventName)
+	assert.Equal(t, "value1", eventSent.Key)
+	assert.Equal(t, "node1", eventSent.NodeID)
+	assert.Equal(t, 10*time.Second, time.Duration(eventSent.TimeMillis)*time.Millisecond)
 
 	respCh, ok := m.PendingLock("value1")
 	assert.True(t, ok)
