@@ -144,6 +144,168 @@ func TestElectionManagerStartElection_SuccessOneProposal(t *testing.T) {
 	assert.Nil(t, stateManager.GetProposals(eventKey), "should have deleted all proposals for the key")
 }
 
+func TestElectionManagerStartElection_SuccessMultipleProposalLowerID(t *testing.T) {
+	nodeName := "node-1"
+	lockManager := &MockLockManager{}
+	clusterManager := &MockClusterManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	stateManager := election.NewStateManager()
+
+	em := cachalot.NewElectionManager(
+		nodeName,
+		logg,
+		lockManager,
+		clusterManager,
+		stateManager,
+		&cachalot.ElectionConfig{
+			TimeToWaitForVotes: 5 * time.Second,
+		},
+	)
+
+	eventKey := "test-key"
+
+	eventTime := time.Date(2025, 5, 5, 0, 0, 0, 0, time.UTC)
+
+	em.TimeFn = func() time.Time {
+		return eventTime
+	}
+
+	event := &domain.ClaimKeyEvent{
+		Key:    eventKey,
+		NodeID: nodeName,
+	}
+
+	em.StartElection(event)
+
+	event2 := &domain.ClaimKeyEvent{
+		Key:    eventKey,
+		NodeID: "node-2",
+	}
+
+	em.StartElection(event2)
+
+	event3 := &domain.ClaimKeyEvent{
+		Key:    eventKey,
+		NodeID: "node-3",
+	}
+
+	em.StartElection(event3)
+
+	proposal := stateManager.GetProposals(eventKey)[nodeName]
+
+	assert.Equal(t, proposal.NodeID, nodeName, "should have created proposal with event node id")
+	assert.Equal(t, proposal.Timestamp, eventTime.UnixNano(), "should have created proposal with correct event time")
+
+	time.Sleep(6 * time.Second)
+
+	clusterManager.Mu.Lock()
+	defer clusterManager.Mu.Unlock()
+
+	assert.Len(t, clusterManager.BroadcastEventCalledWith, 1, "have called broadcast event")
+
+	broadcastedEvent := clusterManager.BroadcastEventCalledWith[0]
+
+	assert.Equal(t, domain.VoteForKeyEventName, broadcastedEvent.EventName, "have called broadcast event with vote for key event")
+
+	var eventSent *domain.Event
+	err := json.Unmarshal(broadcastedEvent.Data, &eventSent)
+
+	assert.NoError(t, err)
+
+	expectedEvent := &domain.Event{
+		Key:    eventKey,
+		NodeID: nodeName,
+		Round:  3,
+	}
+
+	assert.Equal(t, expectedEvent, eventSent, "should have broadcasted correct event")
+
+	assert.Nil(t, stateManager.GetProposals(eventKey), "should have deleted all proposals for the key")
+}
+
+func TestElectionManagerStartElection_SuccessMultipleProposalGreaterID(t *testing.T) {
+	nodeName := "node-10"
+	lockManager := &MockLockManager{}
+	clusterManager := &MockClusterManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	stateManager := election.NewStateManager()
+
+	em := cachalot.NewElectionManager(
+		nodeName,
+		logg,
+		lockManager,
+		clusterManager,
+		stateManager,
+		&cachalot.ElectionConfig{
+			TimeToWaitForVotes: 5 * time.Second,
+		},
+	)
+
+	eventKey := "test-key"
+
+	eventTime := time.Date(2025, 5, 5, 0, 0, 0, 0, time.UTC)
+
+	em.TimeFn = func() time.Time {
+		return eventTime
+	}
+
+	event := &domain.ClaimKeyEvent{
+		Key:    eventKey,
+		NodeID: nodeName,
+	}
+
+	em.StartElection(event)
+
+	event2 := &domain.ClaimKeyEvent{
+		Key:    eventKey,
+		NodeID: "node-20",
+	}
+
+	em.StartElection(event2)
+
+	event3 := &domain.ClaimKeyEvent{
+		Key:    eventKey,
+		NodeID: "node-3",
+	}
+
+	em.StartElection(event3)
+
+	proposal := stateManager.GetProposals(eventKey)[nodeName]
+
+	assert.Equal(t, proposal.NodeID, nodeName, "should have created proposal with event node id")
+	assert.Equal(t, proposal.Timestamp, eventTime.UnixNano(), "should have created proposal with correct event time")
+
+	time.Sleep(6 * time.Second)
+
+	clusterManager.Mu.Lock()
+	defer clusterManager.Mu.Unlock()
+
+	assert.Len(t, clusterManager.BroadcastEventCalledWith, 1, "have called broadcast event")
+
+	broadcastedEvent := clusterManager.BroadcastEventCalledWith[0]
+
+	assert.Equal(t, domain.VoteForKeyEventName, broadcastedEvent.EventName, "have called broadcast event with vote for key event")
+
+	var eventSent *domain.Event
+	err := json.Unmarshal(broadcastedEvent.Data, &eventSent)
+
+	assert.NoError(t, err)
+
+	expectedEvent := &domain.Event{
+		Key:    eventKey,
+		NodeID: "node-3",
+		Round:  3,
+	}
+
+	assert.Equal(t, expectedEvent, eventSent, "should have broadcasted correct event")
+
+	assert.Nil(t, stateManager.GetProposals(eventKey), "should have deleted all proposals for the key")
+}
+
 func TestElectionManagerStartElection_ErrorNoValidRound(t *testing.T) {
 	nodeName := "node1"
 	lockManager := &MockLockManager{}
