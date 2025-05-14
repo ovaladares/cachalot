@@ -3,6 +3,7 @@ package cachalot
 import (
 	"encoding/json"
 	"log/slog"
+	"time"
 
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
 	"github.com/otaviovaladares/cachalot/pkg/domain"
@@ -60,7 +61,7 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 }
 
 func (h *ServiceDiscoveryEventHandler) handleClaimEvent(cEvent *discovery.ClusterEvent) {
-	var event domain.Event
+	var event domain.ClaimKeyEvent
 
 	err := json.Unmarshal(cEvent.Body, &event)
 
@@ -74,7 +75,7 @@ func (h *ServiceDiscoveryEventHandler) handleClaimEvent(cEvent *discovery.Cluste
 }
 
 func (h *ServiceDiscoveryEventHandler) handleVoteForKeyEvent(cEvent *discovery.ClusterEvent) {
-	var event domain.Event
+	var event domain.VoteForKeyEvent
 
 	err := json.Unmarshal(cEvent.Body, &event)
 
@@ -91,31 +92,31 @@ func (h *ServiceDiscoveryEventHandler) handleVoteForKeyEvent(cEvent *discovery.C
 }
 
 func (h *ServiceDiscoveryEventHandler) handleAcquireLockEvent(cEvent *discovery.ClusterEvent) {
-	var lock storage.Lock
+	var event domain.AcquireLockEvent
 
-	err := json.Unmarshal(cEvent.Body, &lock)
+	err := json.Unmarshal(cEvent.Body, &event)
 	if err != nil {
 		h.logg.Error("Failed to decode lock event")
 
 		return
 	}
 
-	isLocked := h.lockManager.IsLocked(lock.Key)
+	isLocked := h.lockManager.IsLocked(event.Key)
 	if isLocked {
-		h.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", lock.Key, "node-id", h.nodeName)
+		h.logg.Error("Lock already acquired", "msg", "Lock already acquired by another log, unable to acquire lock after majority vote", "key", event.Key, "node-id", h.nodeName)
 
 		return
 	}
 
-	ok := h.lockManager.SetLock(lock.Key, lock.NodeID)
+	ok := h.lockManager.SetLock(event.Key, event.NodeID, time.Duration(event.TimeMillis)*time.Millisecond)
 
-	h.lockManager.DeletePendingLock(lock.Key)
+	h.lockManager.DeletePendingLock(event.Key)
 
 	if !ok {
 		return
 	}
 
-	h.logg.Info("Lock acquired", "key", lock.Key, "node-id", lock.NodeID)
+	h.logg.Info("Lock acquired", "key", event.Key, "node-id", event.NodeID)
 }
 
 func (h *ServiceDiscoveryEventHandler) handleRenewLockEvent(event *discovery.ClusterEvent) {

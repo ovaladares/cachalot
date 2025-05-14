@@ -11,7 +11,6 @@ import (
 	cachalot "github.com/otaviovaladares/cachalot/pkg"
 	"github.com/otaviovaladares/cachalot/pkg/domain"
 	"github.com/otaviovaladares/cachalot/pkg/election"
-	"github.com/otaviovaladares/cachalot/pkg/storage"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -35,13 +34,13 @@ func TestElectionManagerVoteForKey_Success(t *testing.T) {
 		},
 	)
 
+	err := em.VoteForKey("test-key", "node1", 0)
+	assert.NoError(t, err, "expected no error when voting for key")
+
 	event := &domain.Event{
 		Key:    "test-key",
 		NodeID: "node1",
 	}
-
-	err := em.VoteForKey(event)
-	assert.NoError(t, err, "expected no error when voting for key")
 
 	var broadcastedEvent domain.Event
 	err = json.Unmarshal(clusterManager.BroadcastEventCalledWith[0].Data, &broadcastedEvent)
@@ -74,12 +73,7 @@ func TestElectionManagerVoteForKey_ErrorOnBroadcast(t *testing.T) {
 		},
 	)
 
-	event := &domain.Event{
-		Key:    "test-key",
-		NodeID: "node1",
-	}
-
-	err := em.VoteForKey(event)
+	err := em.VoteForKey("test-key", "node1", 0)
 	assert.Error(t, err, "expected error when voting for key")
 }
 
@@ -105,7 +99,7 @@ func TestElectionManagerStartElection_SuccessOneProposal(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.ClaimKeyEvent{
 		Key:    eventKey,
 		NodeID: nodeName,
 	}
@@ -172,7 +166,7 @@ func TestElectionManagerStartElection_ErrorNoValidRound(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.ClaimKeyEvent{
 		Key:    eventKey,
 		NodeID: nodeName,
 	}
@@ -224,7 +218,7 @@ func TestElectionManagerHandleVote_DifferentNodeID(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.VoteForKeyEvent{
 		Key:    eventKey,
 		NodeID: "node2",
 	}
@@ -261,7 +255,7 @@ func TestElectionManagerHandleVote_ErrorGettingCount(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.VoteForKeyEvent{
 		Key:    eventKey,
 		NodeID: nodeName,
 	}
@@ -298,7 +292,7 @@ func TestElectionManagerHandleVote_NoMajority(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.VoteForKeyEvent{
 		Key:    eventKey,
 		NodeID: nodeName,
 	}
@@ -341,7 +335,7 @@ func TestElectionManagerHandleVote_NoPendingLock(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.VoteForKeyEvent{
 		Key:    eventKey,
 		NodeID: nodeName,
 	}
@@ -388,12 +382,12 @@ func TestElectionManagerHandleVote_PendingLockButItsLocked(t *testing.T) {
 
 	eventKey := "test-key"
 
-	event := &domain.Event{
+	event := &domain.VoteForKeyEvent{
 		Key:    eventKey,
 		NodeID: nodeName,
 	}
 
-	lockManager.SetLock(eventKey, nodeName)
+	lockManager.SetLock(eventKey, nodeName, 10*time.Second)
 
 	resp := em.HandleVote(event)
 
@@ -436,10 +430,12 @@ func TestElectionManagerHandleVote_SuccessMajority(t *testing.T) {
 	)
 
 	eventKey := "test-key"
+	eventTime := 20 * time.Second
 
-	event := &domain.Event{
-		Key:    eventKey,
-		NodeID: nodeName,
+	event := &domain.VoteForKeyEvent{
+		Key:        eventKey,
+		NodeID:     nodeName,
+		TimeMillis: eventTime.Milliseconds(),
 	}
 
 	resp := em.HandleVote(event)
@@ -461,12 +457,12 @@ func TestElectionManagerHandleVote_SuccessMajority(t *testing.T) {
 
 	assert.Equal(t, domain.LockAcquiredEventName, clusterManager.BroadcastEventCalledWith[0].EventName)
 
-	var broadcastedEvent storage.Lock
+	var broadcastedEvent domain.AcquireLockEvent
 	err := json.Unmarshal(clusterManager.BroadcastEventCalledWith[0].Data, &broadcastedEvent)
 
 	assert.NoError(t, err)
 
 	assert.Equal(t, eventKey, broadcastedEvent.Key, "broadcasted lock event with right key")
 	assert.Equal(t, nodeName, broadcastedEvent.NodeID, "broadcasted lock event with right node name")
-
+	assert.Equal(t, eventTime.Milliseconds(), broadcastedEvent.TimeMillis, "broadcasted lock event with right time millis")
 }

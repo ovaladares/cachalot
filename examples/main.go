@@ -86,7 +86,7 @@ func main() {
 				if currentHour == targetHour && currentMinute == targetMinute {
 					fmt.Printf("Time reached (%02d:%02d), acquiring lock...\n", currentHour, currentMinute)
 
-					err := coordinator.Lock("example-key")
+					err := coordinator.Lock("example-key", 120*time.Second)
 					if err != nil {
 						fmt.Printf("Failed to acquire lock: %v\n", err)
 

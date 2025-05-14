@@ -43,8 +43,8 @@ func (c *Coordinator) Connect() error {
 	return nil
 }
 
-func (c *Coordinator) Lock(key string) error {
-	err := c.internal.Lock(key)
+func (c *Coordinator) Lock(key string, duration time.Duration) error {
+	err := c.internal.Lock(key, duration)
 
 	if err != nil {
 		return err

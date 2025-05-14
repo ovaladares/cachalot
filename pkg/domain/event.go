@@ -6,6 +6,26 @@ type Event struct {
 	Round  int    `json:"round"`
 }
 
+type ClaimKeyEvent struct {
+	Key        string `json:"key"`
+	NodeID     string `json:"node-id"`
+	Round      int    `json:"round"`
+	TimeMillis int64  `json:"time-millis"`
+}
+
+type VoteForKeyEvent struct {
+	Key        string `json:"key"`
+	NodeID     string `json:"node-id"`
+	Round      int    `json:"round"`
+	TimeMillis int64  `json:"time-millis"`
+}
+
+type AcquireLockEvent struct {
+	Key        string `json:"key"`
+	NodeID     string `json:"node-id"`
+	TimeMillis int64  `json:"time-millis"`
+}
+
 type RenewLockEvent struct {
 	Key        string `json:"key"`
 	NodeID     string `json:"node-id"`

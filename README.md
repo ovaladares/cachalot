@@ -1,6 +1,5 @@
 TODO
 
-* renew key + script teste
 * Sync keys que ja existem quando novo node da join
 * feature de schedular task
 * arrumar config serf, e melhor cobertura de testes

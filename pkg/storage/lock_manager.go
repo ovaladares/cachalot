@@ -14,7 +14,7 @@ type LockManager interface {
 	AcquireLock(key, nodeID string, duration time.Duration) (chan string, error)
 	GetLocks() (map[string]string, error)
 	IsLocked(key string) bool
-	SetLock(key, nodeID string) bool
+	SetLock(key, nodeID string, duration time.Duration) bool
 	RenewLock(key string, durationMs int64) error
 	Renew(key string, duration time.Duration) error
 	Release(key string) error
@@ -24,27 +24,26 @@ type LockManager interface {
 }
 
 type LocalLockManager struct {
-	lockRespsWaiting    map[string]chan string
-	lockMap             *TTLLockMap
-	clusterManager      discovery.ClusterManager
-	defaultLockDuration time.Duration //TODO make this come directly as Set parameter
+	lockRespsWaiting map[string]chan string
+	lockMap          *TTLLockMap
+	clusterManager   discovery.ClusterManager
 
 	mu sync.RWMutex
 }
 
-func NewLocalLockManager(clusterManager discovery.ClusterManager, lockDuration time.Duration) *LocalLockManager {
+func NewLocalLockManager(clusterManager discovery.ClusterManager) *LocalLockManager {
 	return &LocalLockManager{
-		lockRespsWaiting:    make(map[string]chan string),
-		lockMap:             NewTTLLockMap(),
-		clusterManager:      clusterManager,
-		defaultLockDuration: lockDuration,
+		lockRespsWaiting: make(map[string]chan string),
+		lockMap:          NewTTLLockMap(),
+		clusterManager:   clusterManager,
 	}
 }
 
-func (lm *LocalLockManager) AcquireLock(key, nodeID string, _ time.Duration) (chan string, error) { //TODO make duration work
-	event := domain.Event{
-		Key:    key,
-		NodeID: nodeID,
+func (lm *LocalLockManager) AcquireLock(key, nodeID string, duration time.Duration) (chan string, error) { //TODO make duration work
+	event := domain.ClaimKeyEvent{
+		Key:        key,
+		NodeID:     nodeID,
+		TimeMillis: duration.Milliseconds(),
 	}
 
 	b, err := json.Marshal(event)
@@ -139,8 +138,8 @@ func (lm *LocalLockManager) IsLocked(key string) bool {
 	return lm.lockMap.IsLocked(key)
 }
 
-func (lm *LocalLockManager) SetLock(key, nodeID string) bool {
-	return lm.lockMap.Acquire(nodeID, key, lm.defaultLockDuration)
+func (lm *LocalLockManager) SetLock(key, nodeID string, duration time.Duration) bool {
+	return lm.lockMap.Acquire(nodeID, key, duration)
 }
 
 func (lm *LocalLockManager) RenewLock(key string, durationMs int64) error {

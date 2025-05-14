@@ -72,7 +72,7 @@ func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
 }
 
 func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
-	voteEvent := &domain.Event{
+	voteEvent := &domain.VoteForKeyEvent{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
@@ -97,7 +97,7 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 }
 
 func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
-	claimEvent := &domain.Event{
+	claimEvent := &domain.ClaimKeyEvent{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
