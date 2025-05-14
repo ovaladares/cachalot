@@ -11,7 +11,6 @@ import (
 	cachalot "github.com/otaviovaladares/cachalot/pkg"
 	"github.com/otaviovaladares/cachalot/pkg/domain"
 	"github.com/otaviovaladares/cachalot/pkg/election"
-	"github.com/otaviovaladares/cachalot/pkg/storage"
 	"github.com/stretchr/testify/assert"
 )
 
@@ -431,10 +430,12 @@ func TestElectionManagerHandleVote_SuccessMajority(t *testing.T) {
 	)
 
 	eventKey := "test-key"
+	eventTime := 20 * time.Second
 
 	event := &domain.VoteForKeyEvent{
-		Key:    eventKey,
-		NodeID: nodeName,
+		Key:        eventKey,
+		NodeID:     nodeName,
+		TimeMillis: eventTime.Milliseconds(),
 	}
 
 	resp := em.HandleVote(event)
@@ -456,12 +457,12 @@ func TestElectionManagerHandleVote_SuccessMajority(t *testing.T) {
 
 	assert.Equal(t, domain.LockAcquiredEventName, clusterManager.BroadcastEventCalledWith[0].EventName)
 
-	var broadcastedEvent storage.Lock
+	var broadcastedEvent domain.AcquireLockEvent
 	err := json.Unmarshal(clusterManager.BroadcastEventCalledWith[0].Data, &broadcastedEvent)
 
 	assert.NoError(t, err)
 
 	assert.Equal(t, eventKey, broadcastedEvent.Key, "broadcasted lock event with right key")
 	assert.Equal(t, nodeName, broadcastedEvent.NodeID, "broadcasted lock event with right node name")
-
+	assert.Equal(t, eventTime.Milliseconds(), broadcastedEvent.TimeMillis, "broadcasted lock event with right time millis")
 }
