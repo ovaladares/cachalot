@@ -14,7 +14,7 @@ import (
 )
 
 func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
-	lockEvent := &storage.Lock{
+	lockEvent := &domain.AcquireLockEvent{
 		Key:    "test-key",
 		NodeID: "test-node",
 	}
