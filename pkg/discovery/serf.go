@@ -12,6 +12,9 @@ import (
 	"github.com/hashicorp/serf/serf"
 )
 
+// Simple wrapper around the Serf library to provide a consistent interface
+// for service discovery and event handling in a distributed system.
+// It uses the Serf library to manage cluster membership and events.
 type SerfDiscover struct {
 	bindAddr   string
 	seedNodes  []string
