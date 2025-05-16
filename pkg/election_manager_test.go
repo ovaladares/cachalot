@@ -305,10 +305,6 @@ func TestElectionManagerHandleVote_NoMajority(t *testing.T) {
 	assert.Len(t, clusterManager.BroadcastEventCalledWith, 0, "should not have called broadcast event")
 }
 
-// func TestElectionManagerStartElection_DetermineWinnerMultipleProposals(t *testing.T) {
-// 	panic("not implemented")
-// }
-
 func TestElectionManagerHandleVote_NoPendingLock(t *testing.T) {
 	nodeName := "node1"
 	lockManager := &MockLockManager{

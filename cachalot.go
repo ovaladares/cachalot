@@ -32,8 +32,7 @@ func NewCoordinator(bindAddr string, seedNodes []string, config *Config) *Coordi
 		bindAddr,
 		seedNodes,
 		&cachalot.CoordinatorConfig{
-			DefaultLockDuration: conf.DefaultLockDuration,
-			DiscoveryProvider:   conf.DiscoveryBackend,
+			DiscoveryProvider: conf.DiscoveryBackend,
 			ElectionConfig: &cachalot.ElectionConfig{
 				TimeToWaitForVotes: conf.ElectionConfig.TimeToWaitForVotes,
 			},

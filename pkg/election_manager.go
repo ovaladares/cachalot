@@ -16,28 +16,42 @@ import (
 )
 
 type ElectionConfig struct {
+	// TimeToWaitForVotes is the time to wait for votes from other nodes
+	// before proceeding with the election process. This is important for
+	// ensuring that all nodes have a chance to participate in the election
 	TimeToWaitForVotes time.Duration
-
-	ElectionFn func(key string, round int) error
 }
 
 // ElectionManager defines the interface for managing distributed elections
 type ElectionManager interface {
+	// StartElection initiates an election for a key
 	StartElection(event *domain.ClaimKeyEvent)
+	// HandleVote processes a vote for a key
 	HandleVote(event *domain.VoteForKeyEvent) error
+	// VoteForKey sends a vote for a key
 	VoteForKey(string, string, int) error
 }
 
 // DistributedElectionManager handles the distributed election process for locks
+// It implements the ElectionManager interface and uses a state manager to
+// track the state of elections and a lock manager to manage locks
+// It also uses a cluster manager to communicate with other nodes in the cluster
 type DistributedElectionManager struct {
-	nodeName       string
-	logg           *slog.Logger
+	// nodeName is the unique identifier for this node in the cluster
+	nodeName string
+	// logg is the logger used for logging messages
+	logg *slog.Logger
+	// clusterManager is used to manage the cluster and communicate with other nodes
 	clusterManager discovery.ClusterManager
-	lockManager    storage.LockManager
-	stateManager   *election.StateManager
-	mu             sync.RWMutex
-	TimeFn         func() time.Time
-	conf           *ElectionConfig
+	// lockManager is used to manage locks in the cluster
+	// It is responsible for acquiring, renewing, and releasing locks
+	lockManager storage.LockManager
+	// stateManager is used to manage the state of elections
+	// It is responsible for tracking proposals, votes, and the current state of elections
+	stateManager *election.StateManager
+	mu           sync.RWMutex
+	TimeFn       func() time.Time
+	conf         *ElectionConfig
 }
 
 // NewElectionManager creates a new DistributedElectionManager

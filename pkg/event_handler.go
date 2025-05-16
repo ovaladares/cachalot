@@ -10,6 +10,12 @@ import (
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+// ServiceDiscoveryEventHandler handles events from the service discovery system.
+// It is a middle layer between the discovery system and the application logic.
+// It exists to decouple the application from the discovery system.
+// It handles events such as member join, leave, and failed events.
+// It also handles events related to distributed locks, such as acquiring, renewing,
+// and releasing locks.
 type ServiceDiscoveryEventHandler struct {
 	lockManager     storage.LockManager
 	electionManager ElectionManager

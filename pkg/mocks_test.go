@@ -9,6 +9,10 @@ import (
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+// This file contains mock implementations of various interfaces used in the
+// Cachalot package. These mocks are useful for unit testing and simulating
+// different behaviors of the components without needing to rely on actual
+
 type MockElectionManager struct {
 	StartElectionCalledWith []*domain.ClaimKeyEvent
 	HandleVoteCalledWith    []*domain.VoteForKeyEvent
