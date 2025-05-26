@@ -19,6 +19,7 @@ import (
 type ServiceDiscoveryEventHandler struct {
 	lockManager     storage.LockManager
 	electionManager ElectionManager
+	snapshotManager SnapshotManager
 	nodeName        string
 	logg            *slog.Logger
 }
@@ -26,12 +27,14 @@ type ServiceDiscoveryEventHandler struct {
 func NewServiceDiscoveryEventHandler(
 	lockManager storage.LockManager,
 	electionManager ElectionManager,
+	snapshotManager SnapshotManager,
 	nodeName string,
 	logg *slog.Logger,
 ) *ServiceDiscoveryEventHandler {
 	return &ServiceDiscoveryEventHandler{
 		lockManager:     lockManager,
 		electionManager: electionManager,
+		snapshotManager: snapshotManager,
 		nodeName:        nodeName,
 		logg:            logg,
 	}
@@ -61,8 +64,60 @@ func (h *ServiceDiscoveryEventHandler) Handle(event *discovery.ClusterEvent) {
 		h.handleRenewLockEvent(event)
 	case domain.ReleaseLockEventName:
 		h.handleReleaseLockEvent(event)
+	case domain.LocksRequestEventName:
+		h.handleLocksRequestEvent(event)
+	case domain.LocksSnapShotEventName:
+		h.handleLocksSnapShotEvent(event)
 	default:
 		h.logg.Warn("unknown event type", "type", event.Type)
+	}
+}
+
+func (h *ServiceDiscoveryEventHandler) handleLocksSnapShotEvent(event *discovery.ClusterEvent) {
+	var locksSnapShotEvent domain.LocksSnapShotEvent
+
+	if err := json.Unmarshal(event.Body, &locksSnapShotEvent); err != nil {
+		h.logg.Error("failed to unmarshal locks snapshot event", "error", err)
+
+		return
+	}
+
+	if locksSnapShotEvent.NodeID == h.nodeName {
+		h.logg.Debug("ignoring self locks snapshot event")
+
+		return
+	}
+
+	err := h.snapshotManager.AddSnapshot(&locksSnapShotEvent)
+	if err != nil {
+		h.logg.Error("error adding locks snapshot", "node-id", locksSnapShotEvent.NodeID)
+
+		return
+	}
+
+	h.logg.Debug("locks snapshot received", "node-id", locksSnapShotEvent.NodeID, "locks", locksSnapShotEvent.Locks)
+}
+
+func (h *ServiceDiscoveryEventHandler) handleLocksRequestEvent(event *discovery.ClusterEvent) {
+	var locksRequestEvent domain.LocksRequestEvent
+
+	if err := json.Unmarshal(event.Body, &locksRequestEvent); err != nil {
+		h.logg.Error("failed to unmarshal locks request event", "error", err)
+
+		return
+	}
+
+	if locksRequestEvent.NodeID == h.nodeName {
+		h.logg.Debug("ignoring self locks request event")
+
+		return
+	}
+
+	err := h.lockManager.DumpLocks()
+	if err != nil {
+		h.logg.Error("failed to dump locks to network", "error", err)
+
+		return
 	}
 }
 

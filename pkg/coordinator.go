@@ -7,6 +7,7 @@ import (
 
 	"github.com/otaviovaladares/cachalot/pkg/discovery"
 	"github.com/otaviovaladares/cachalot/pkg/election"
+	"github.com/otaviovaladares/cachalot/pkg/snapshot"
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
@@ -127,9 +128,17 @@ func (c *LocalCoordinator) Connect() error { //Maybe return a Node instance?
 	c.logg.Debug("Cluster manager connected", "node_id", c.clusterManager.GetNodeID())
 
 	electionManager := NewElectionManager(c.GetNodeID(), c.logg, c.lockManager, c.clusterManager, election.NewStateManager(), c.conf.ElectionConfig)
-	eventHandler := NewServiceDiscoveryEventHandler(c.lockManager, electionManager, c.GetNodeID(), c.logg)
+	snapShotManager := NewLocalSnapshotManager(c.GetNodeID(), c.lockManager, c.clusterManager, snapshot.NewStateManager(), c.logg)
+
+	eventHandler := NewServiceDiscoveryEventHandler(c.lockManager, electionManager, snapShotManager, c.GetNodeID(), c.logg)
 
 	c.clusterManager.RegisterEventHandler(eventHandler.Handle)
+
+	err = snapShotManager.SyncLocks()
+	if err != nil {
+		c.logg.Warn("Failed to sync locks from snapshot", "error", err)
+	}
+	c.logg.Debug("Locks synced", "node_id", c.GetNodeID())
 
 	return nil
 }

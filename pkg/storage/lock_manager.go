@@ -21,6 +21,8 @@ type LockManager interface {
 	ReleaseLock(key string) error
 	PendingLock(key string) (chan string, bool)
 	DeletePendingLock(key string)
+
+	DumpLocks() error
 }
 
 type LocalLockManager struct {
@@ -202,4 +204,33 @@ func (lm *LocalLockManager) GetLocks() (map[string]string, error) {
 	}
 
 	return locksMap, nil
+}
+
+func (lm *LocalLockManager) DumpLocks() error {
+	locks := lm.lockMap.Locks()
+
+	var snapshotEvent domain.LocksSnapShotEvent
+
+	snapshotEvent.NodeID = lm.clusterManager.GetNodeID()
+
+	for _, lock := range locks {
+		snapshotEvent.Locks[lock.Key] = domain.LockSnapshot{
+			NodeID:     lock.NodeID,
+			TimeMillis: lock.createdAt.UnixMilli(),
+			Key:        lock.Key,
+		}
+	}
+
+	b, err := json.Marshal(snapshotEvent)
+
+	if err != nil {
+		return fmt.Errorf("failed to marshal event: %w", err)
+	}
+
+	err = lm.clusterManager.BroadcastEvent(domain.LocksSnapShotEventName, b)
+	if err != nil {
+		return fmt.Errorf("failed to send locks snapshot event: %w", err)
+	}
+
+	return nil
 }
