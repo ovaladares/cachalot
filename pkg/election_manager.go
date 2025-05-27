@@ -29,7 +29,7 @@ type ElectionManager interface {
 	// HandleVote processes a vote for a key
 	HandleVote(event *domain.VoteForKeyEvent) error
 	// VoteForKey sends a vote for a key
-	VoteForKey(string, string, int) error
+	VoteForKey(string, string, int64, int) error
 }
 
 // DistributedElectionManager handles the distributed election process for locks
@@ -80,7 +80,7 @@ func (em *DistributedElectionManager) StartElection(event *domain.ClaimKeyEvent)
 	timestamp := em.TimeFn().UnixNano()
 	round := em.stateManager.AddProposal(event.Key, event.NodeID, timestamp)
 
-	go em.runElection(event.Key, round)
+	go em.runElection(event.Key, event.TimeMillis, round)
 }
 
 // HandleVote processes a vote for a key
@@ -134,7 +134,7 @@ func (em *DistributedElectionManager) HandleVote(event *domain.VoteForKeyEvent) 
 }
 
 // runElection runs the election process for a key
-func (em *DistributedElectionManager) runElection(key string, round int) {
+func (em *DistributedElectionManager) runElection(key string, timeMillis int64, round int) {
 	// Wait a short time to collect all proposals
 	// This should be tuned based on network characteristics
 	time.Sleep(em.conf.TimeToWaitForVotes)
@@ -151,7 +151,7 @@ func (em *DistributedElectionManager) runElection(key string, round int) {
 
 	winningNodeID := em.determineWinner(proposals)
 
-	err := em.VoteForKey(key, winningNodeID, round)
+	err := em.VoteForKey(key, winningNodeID, timeMillis, round)
 
 	if err != nil {
 		em.logg.Error("Failed to vote for key", "error", err)
@@ -187,11 +187,12 @@ func (em *DistributedElectionManager) determineWinner(proposals map[string]*elec
 	return winningNodeID
 }
 
-func (em *DistributedElectionManager) VoteForKey(key, nodeID string, round int) error {
+func (em *DistributedElectionManager) VoteForKey(key, nodeID string, timeMillis int64, round int) error {
 	event := domain.VoteForKeyEvent{
-		Key:    key,
-		NodeID: nodeID,
-		Round:  round,
+		Key:        key,
+		NodeID:     nodeID,
+		Round:      round,
+		TimeMillis: timeMillis,
 	}
 
 	b, err := json.Marshal(event)
