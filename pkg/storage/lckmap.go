@@ -15,8 +15,8 @@ type Lock struct {
 	timer     *time.Timer
 	createdAt time.Time
 	duration  time.Duration
-	Key       string
-	NodeID    string
+	Key       string `json:"key"`
+	NodeID    string `json:"node-id"`
 }
 
 func NewTTLLockMap() *TTLLockMap {
