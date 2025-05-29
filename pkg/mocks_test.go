@@ -37,7 +37,7 @@ func (m *MockElectionManager) HandleVote(event *domain.VoteForKeyEvent) error {
 	return nil
 }
 
-func (m *MockElectionManager) VoteForKey(_, _ string, _ int) error {
+func (m *MockElectionManager) VoteForKey(_, _ string, _ int64, _ int) error {
 	panic("implement me")
 }
 
