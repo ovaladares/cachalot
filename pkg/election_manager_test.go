@@ -34,7 +34,9 @@ func TestElectionManagerVoteForKey_Success(t *testing.T) {
 		},
 	)
 
-	err := em.VoteForKey("test-key", "node1", 0)
+	time := 20 * time.Second
+
+	err := em.VoteForKey("test-key", "node1", time.Milliseconds(), 0)
 	assert.NoError(t, err, "expected no error when voting for key")
 
 	event := &domain.Event{
@@ -73,7 +75,9 @@ func TestElectionManagerVoteForKey_ErrorOnBroadcast(t *testing.T) {
 		},
 	)
 
-	err := em.VoteForKey("test-key", "node1", 0)
+	time := 20 * time.Second
+
+	err := em.VoteForKey("test-key", "node1", time.Milliseconds(), 0)
 	assert.Error(t, err, "expected error when voting for key")
 }
 
