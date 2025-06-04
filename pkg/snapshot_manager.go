@@ -71,7 +71,7 @@ func (m *LocalSnapshotManager) SyncLocks() error {
 		return fmt.Errorf("failed to marshal event: %w", err)
 	}
 
-	err = m.clusterManager.BroadcastEvent(domain.LockAcquiredEventName, b)
+	err = m.clusterManager.BroadcastEvent(domain.LocksRequestEventName, b)
 	if err != nil {
 		return fmt.Errorf("failed to send user event: %w", err)
 	}
@@ -121,10 +121,9 @@ func (m *LocalSnapshotManager) SyncLocks() error {
 
 		m.logg.Debug("Acquiring lock", "key", key, "node-id", lock.NodeID)
 
-		// TODO sync expire time
-		err := m.lockManager.SetLock(lock.NodeID, key, time.Duration(lock.TimeMillis)*time.Millisecond)
-		if err {
-			return fmt.Errorf("failed to acquire lock: %w", err)
+		ok := m.lockManager.SetLock(key, lock.NodeID, time.Duration(lock.TimeMillis)*time.Millisecond)
+		if !ok {
+			return fmt.Errorf("failed to acquire lock for key: %s", key)
 		}
 	}
 

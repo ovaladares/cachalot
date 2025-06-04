@@ -213,6 +213,8 @@ func (lm *LocalLockManager) DumpLocks() error {
 
 	snapshotEvent.NodeID = lm.clusterManager.GetNodeID()
 
+	snapshotEvent.Locks = make(map[string]domain.LockSnapshot)
+
 	for _, lock := range locks {
 		snapshotEvent.Locks[lock.Key] = domain.LockSnapshot{
 			NodeID:     lock.NodeID,
