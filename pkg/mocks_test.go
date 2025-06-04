@@ -9,6 +9,16 @@ import (
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+type MockSnapshotManager struct{}
+
+func (m *MockSnapshotManager) SyncLocks() error {
+	return nil
+}
+
+func (m *MockSnapshotManager) AddSnapshot(event *domain.LocksSnapShotEvent) error {
+	return nil
+}
+
 // This file contains mock implementations of various interfaces used in the
 // Cachalot package. These mocks are useful for unit testing and simulating
 // different behaviors of the components without needing to rely on actual
@@ -73,6 +83,10 @@ func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration
 }
 
 func (m *MockLockManager) GetLocks() (map[string]string, error) {
+	panic("implement me")
+}
+
+func (m *MockLockManager) DumpLocks() error {
 	panic("implement me")
 }
 
