@@ -36,6 +36,9 @@ func NewCoordinator(bindAddr string, seedNodes []string, config *Config) *Coordi
 			ElectionConfig: &cachalot.ElectionConfig{
 				TimeToWaitForVotes: conf.ElectionConfig.TimeToWaitForVotes,
 			},
+			SnapshotConfig: &cachalot.SnapshotConfig{
+				TimeToWaitForSnapshot: conf.SnapshotConfig.TimeToWaitForSnapshot,
+			},
 		},
 	)
 

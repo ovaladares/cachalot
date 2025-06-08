@@ -15,6 +15,16 @@ type Config struct {
 
 	// ElectionConfig contains configuration parameters for lock election in the cluster.
 	ElectionConfig *ElectionConfig
+
+	// SnapshotConfig contains configuration parameters for snapshot management in the cluster.
+	SnapshotConfig *SnapshotConfig
+}
+
+type SnapshotConfig struct {
+	// TimeToWaitForSnapshotInMs is the time to wait for a snapshot from other nodes
+	// Warning: Higher values may lead to longer election times.
+	// Increasing this value may be necessary in environments with high latency
+	TimeToWaitForSnapshot time.Duration
 }
 
 type ElectionConfig struct {
@@ -33,6 +43,9 @@ var defaultConfig = &Config{
 	DiscoveryBackend: "serf",
 	ElectionConfig: &ElectionConfig{
 		TimeToWaitForVotes: 2 * time.Second,
+	},
+	SnapshotConfig: &SnapshotConfig{
+		TimeToWaitForSnapshot: 3 * time.Second,
 	},
 }
 
@@ -54,6 +67,14 @@ func NewConfig(userConf *Config) *Config {
 	} else {
 		if userConf.ElectionConfig.TimeToWaitForVotes == 0 {
 			userConf.ElectionConfig.TimeToWaitForVotes = defaultConfig.ElectionConfig.TimeToWaitForVotes
+		}
+	}
+
+	if userConf.SnapshotConfig == nil {
+		userConf.SnapshotConfig = defaultConfig.SnapshotConfig
+	} else {
+		if userConf.SnapshotConfig.TimeToWaitForSnapshot == 0 {
+			userConf.SnapshotConfig.TimeToWaitForSnapshot = defaultConfig.SnapshotConfig.TimeToWaitForSnapshot
 		}
 	}
 
