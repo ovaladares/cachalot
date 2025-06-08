@@ -59,6 +59,9 @@ type CoordinatorConfig struct {
 	// ElectionConfig contains configuration parameters for leader election in the cluster.
 	// This controls how leader election processes work when nodes join or leave.
 	ElectionConfig *ElectionConfig
+
+	// SnapshotConfig contains configuration parameters for snapshot management.
+	SnapshotConfig *SnapshotConfig
 }
 
 // LocalCoordinator implements the Coordinator interface using local storage
@@ -128,7 +131,7 @@ func (c *LocalCoordinator) Connect() error { //Maybe return a Node instance?
 	c.logg.Debug("Cluster manager connected", "node_id", c.clusterManager.GetNodeID())
 
 	electionManager := NewElectionManager(c.GetNodeID(), c.logg, c.lockManager, c.clusterManager, election.NewStateManager(), c.conf.ElectionConfig)
-	snapShotManager := NewLocalSnapshotManager(c.GetNodeID(), c.lockManager, c.clusterManager, snapshot.NewStateManager(), c.logg)
+	snapShotManager := NewLocalSnapshotManager(c.GetNodeID(), c.lockManager, c.clusterManager, snapshot.NewStateManager(), c.conf.SnapshotConfig, c.logg)
 
 	eventHandler := NewServiceDiscoveryEventHandler(c.lockManager, electionManager, snapShotManager, c.GetNodeID(), c.logg)
 

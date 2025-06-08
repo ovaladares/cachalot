@@ -12,13 +12,24 @@ import (
 )
 
 func TestSnapshotManager_AddSnapshot(t *testing.T) {
+	conf := &cachalot.SnapshotConfig{
+		TimeToWaitForSnapshot: 3 * time.Second,
+	}
+
 	nodeName := "node1"
 	lockManager := &MockLockManager{}
 	clusterManager := &MockClusterManager{}
 	stateManager := snapshot.NewStateManager()
 	logg := slog.Default()
 
-	snapshotManager := cachalot.NewLocalSnapshotManager(nodeName, lockManager, clusterManager, stateManager, logg)
+	snapshotManager := cachalot.NewLocalSnapshotManager(
+		nodeName,
+		lockManager,
+		clusterManager,
+		stateManager,
+		conf,
+		logg,
+	)
 
 	lockSnap := domain.LockSnapshot{
 		Key:        "lock1",
@@ -41,13 +52,24 @@ func TestSnapshotManager_AddSnapshot(t *testing.T) {
 }
 
 func TestSnapshotManager_AddSnapshotSameNodeID(t *testing.T) {
+	conf := &cachalot.SnapshotConfig{
+		TimeToWaitForSnapshot: 3 * time.Second,
+	}
+
 	nodeName := "node2"
 	lockManager := &MockLockManager{}
 	clusterManager := &MockClusterManager{}
 	stateManager := snapshot.NewStateManager()
 	logg := slog.Default()
 
-	snapshotManager := cachalot.NewLocalSnapshotManager(nodeName, lockManager, clusterManager, stateManager, logg)
+	snapshotManager := cachalot.NewLocalSnapshotManager(
+		nodeName,
+		lockManager,
+		clusterManager,
+		stateManager,
+		conf,
+		logg,
+	)
 
 	lockSnap := domain.LockSnapshot{
 		Key:        "lock1",
@@ -69,13 +91,24 @@ func TestSnapshotManager_AddSnapshotSameNodeID(t *testing.T) {
 }
 
 func TestSnapshotManger_SyncLocksSuccessVariosLocks(t *testing.T) {
+	conf := &cachalot.SnapshotConfig{
+		TimeToWaitForSnapshot: 3 * time.Second,
+	}
+
 	nodeName := "node-1"
 	lockManager := &MockLockManager{}
 	clusterManager := &MockClusterManager{}
 	stateManager := snapshot.NewStateManager()
 	logg := slog.Default()
 
-	snapshotManager := cachalot.NewLocalSnapshotManager(nodeName, lockManager, clusterManager, stateManager, logg)
+	snapshotManager := cachalot.NewLocalSnapshotManager(
+		nodeName,
+		lockManager,
+		clusterManager,
+		stateManager,
+		conf,
+		logg,
+	)
 
 	expectedLocks := map[string]string{
 		"lock1": "node-2",
@@ -125,13 +158,23 @@ func TestSnapshotManger_SyncLocksSuccessVariosLocks(t *testing.T) {
 }
 
 func TestSnapshotManger_SyncLocksSuccessNoLocksReceived(t *testing.T) {
+	conf := &cachalot.SnapshotConfig{
+		TimeToWaitForSnapshot: 3 * time.Second,
+	}
 	nodeName := "node-1"
 	lockManager := &MockLockManager{}
 	clusterManager := &MockClusterManager{}
 	stateManager := snapshot.NewStateManager()
 	logg := slog.Default()
 
-	snapshotManager := cachalot.NewLocalSnapshotManager(nodeName, lockManager, clusterManager, stateManager, logg)
+	snapshotManager := cachalot.NewLocalSnapshotManager(
+		nodeName,
+		lockManager,
+		clusterManager,
+		stateManager,
+		conf,
+		logg,
+	)
 
 	snapshotManager.SyncLocks()
 	time.Sleep(4 * time.Second) // Wait for the snapshots to be processed

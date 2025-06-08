@@ -14,6 +14,10 @@ import (
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+type SnapshotConfig struct {
+	TimeToWaitForSnapshot time.Duration
+}
+
 type SnapshotManager interface {
 	SyncLocks() error
 
@@ -25,6 +29,7 @@ type LocalSnapshotManager struct {
 	lockManager    storage.LockManager
 	clusterManager discovery.ClusterManager
 	stateManager   *snapshot.StateManager
+	config         *SnapshotConfig
 	logg           *slog.Logger
 }
 
@@ -33,6 +38,7 @@ func NewLocalSnapshotManager(
 	lockManager storage.LockManager,
 	clusterManager discovery.ClusterManager,
 	stateManager *snapshot.StateManager,
+	snapshotConfig *SnapshotConfig,
 	logg *slog.Logger,
 ) *LocalSnapshotManager {
 	return &LocalSnapshotManager{
@@ -40,6 +46,7 @@ func NewLocalSnapshotManager(
 		lockManager:    lockManager,
 		clusterManager: clusterManager,
 		stateManager:   stateManager,
+		config:         snapshotConfig,
 		logg:           logg,
 	}
 }
@@ -77,7 +84,7 @@ func (m *LocalSnapshotManager) SyncLocks() error {
 	}
 
 	// Wait for the locks snapshot event
-	time.Sleep(3 * time.Second) // TODO: replace with configurable timeout
+	time.Sleep(m.config.TimeToWaitForSnapshot) // TODO: replace with configurable timeout
 
 	snapshots := m.stateManager.GetAllSnapshots()
 	if len(snapshots) == 0 {
