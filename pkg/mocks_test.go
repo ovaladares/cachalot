@@ -9,6 +9,26 @@ import (
 	"github.com/otaviovaladares/cachalot/pkg/storage"
 )
 
+type MockSnapshotManager struct {
+	AddSnapshotCalledWith []*domain.LocksSnapShotEvent
+
+	Mu sync.RWMutex
+}
+
+func (m *MockSnapshotManager) SyncLocks() error {
+	return nil
+}
+
+func (m *MockSnapshotManager) AddSnapshot(event *domain.LocksSnapShotEvent) error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+	if event != nil {
+		m.AddSnapshotCalledWith = append(m.AddSnapshotCalledWith, event)
+	}
+
+	return nil
+}
+
 // This file contains mock implementations of various interfaces used in the
 // Cachalot package. These mocks are useful for unit testing and simulating
 // different behaviors of the components without needing to rely on actual
@@ -66,6 +86,8 @@ type MockLockManager struct {
 	ReleaseLockCallCount  int
 	ReleaseLockCalledWith []string
 	ReleaseLockErr        error
+
+	DumpLocksCallCount int
 }
 
 func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration) (chan string, error) {
@@ -73,7 +95,27 @@ func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration
 }
 
 func (m *MockLockManager) GetLocks() (map[string]string, error) {
-	panic("implement me")
+	m.Mu.RLock()
+	defer m.Mu.RUnlock()
+
+	if m.locks == nil {
+		return nil, nil
+	}
+
+	locksCopy := make(map[string]string, len(m.locks))
+	for k, v := range m.locks {
+		locksCopy[k] = v
+	}
+
+	return locksCopy, nil
+}
+
+func (m *MockLockManager) DumpLocks() error {
+	m.Mu.Lock()
+	defer m.Mu.Unlock()
+
+	m.DumpLocksCallCount++
+	return nil
 }
 
 func (m *MockLockManager) IsLocked(key string) bool {

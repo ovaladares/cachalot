@@ -24,10 +24,11 @@ func TestEventHandlerHandle_HandleAcquireLockEvent(t *testing.T) {
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
 		Type: domain.LockAcquiredEventName,
@@ -57,10 +58,11 @@ func TestEventHandlerHandle_HandleAcquireLockEventAlreadyLocked(t *testing.T) {
 		},
 	}
 	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
 		Type: domain.LockAcquiredEventName,
@@ -82,10 +84,11 @@ func TestEventHandlerHandle_VoteForKeySuccess(t *testing.T) {
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
 		Type: domain.VoteForKeyEventName,
@@ -107,10 +110,11 @@ func TestEventHandlerHandle_ClaimKeySuccess(t *testing.T) {
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
 		Type: domain.ClaimKeyEventName,
@@ -132,10 +136,11 @@ func TestEventHandlerHandle_RenewLockEvent(t *testing.T) {
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
 		Type: domain.RenewLockEventName,
@@ -157,10 +162,11 @@ func TestEventHandlerHandle_ReleaseLockEvent(t *testing.T) {
 
 	lockManager := &MockLockManager{}
 	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
 
 	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
 
-	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, "test-node", logg)
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
 
 	eventHandler.Handle(&discovery.ClusterEvent{
 		Type: domain.ReleaseLockEventName,
@@ -169,4 +175,115 @@ func TestEventHandlerHandle_ReleaseLockEvent(t *testing.T) {
 
 	assert.Len(t, lockManager.ReleaseLockCalledWith, 1, "expected release to be called once")
 	assert.Equal(t, releaseEvent.Key, lockManager.ReleaseLockCalledWith[0], "expected release to be called with the correct key")
+}
+
+func TestEventHandlerHandle_LocksRequestEvent(t *testing.T) {
+	locksRequestEvent := &domain.LocksRequestEvent{
+		NodeID: "test-node2",
+	}
+
+	b, err := json.Marshal(locksRequestEvent)
+	assert.NoError(t, err, "failed to marshal locks request event")
+
+	lockManager := &MockLockManager{}
+	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
+
+	eventHandler.Handle(&discovery.ClusterEvent{
+		Type: domain.LocksRequestEventName,
+		Body: b,
+	})
+
+	assert.Equal(t, 1, lockManager.DumpLocksCallCount, "expected DumpLocks to be called once")
+}
+
+func TestEventHandlerHandle_LocksRequestEventSameNodeID(t *testing.T) {
+	locksRequestEvent := &domain.LocksRequestEvent{
+		NodeID: "test-node",
+	}
+
+	b, err := json.Marshal(locksRequestEvent)
+	assert.NoError(t, err, "failed to marshal locks request event")
+
+	lockManager := &MockLockManager{}
+	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
+
+	eventHandler.Handle(&discovery.ClusterEvent{
+		Type: domain.LocksRequestEventName,
+		Body: b,
+	})
+
+	assert.Equal(t, 0, lockManager.DumpLocksCallCount, "expected DumpLocks to not be called")
+}
+
+func TestHandlerHandle_LocksSnapshotEvent(t *testing.T) {
+	locksSnapshotEvent := &domain.LocksSnapShotEvent{
+		NodeID: "test-node2",
+		Locks: map[string]domain.LockSnapshot{
+			"test-key": {
+				Key:        "test-key",
+				NodeID:     "test-node2",
+				TimeMillis: 1234567890,
+			},
+		},
+	}
+
+	b, err := json.Marshal(locksSnapshotEvent)
+	assert.NoError(t, err, "failed to marshal locks snapshot event")
+
+	lockManager := &MockLockManager{}
+	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
+
+	eventHandler.Handle(&discovery.ClusterEvent{
+		Type: domain.LocksSnapShotEventName,
+		Body: b,
+	})
+
+	assert.Len(t, snapshotManager.AddSnapshotCalledWith, 1, "expected one locks snapshot event to be handled")
+	assert.Equal(t, locksSnapshotEvent, snapshotManager.AddSnapshotCalledWith[0], "expected locks snapshot event to be handled")
+}
+
+func TestHandlerHandle_LocksSnapshotEventSameNodeID(t *testing.T) {
+	locksSnapshotEvent := &domain.LocksSnapShotEvent{
+		NodeID: "test-node",
+		Locks: map[string]domain.LockSnapshot{
+			"test-key": {
+				Key:        "test-key",
+				NodeID:     "test-node2",
+				TimeMillis: 1234567890,
+			},
+		},
+	}
+
+	b, err := json.Marshal(locksSnapshotEvent)
+	assert.NoError(t, err, "failed to marshal locks snapshot event")
+
+	lockManager := &MockLockManager{}
+	electionManager := &MockElectionManager{}
+	snapshotManager := &MockSnapshotManager{}
+
+	logg := slog.New(slog.NewTextHandler(io.Discard, nil))
+
+	eventHandler := cachalot.NewServiceDiscoveryEventHandler(lockManager, electionManager, snapshotManager, "test-node", logg)
+
+	eventHandler.Handle(&discovery.ClusterEvent{
+		Type: domain.LocksSnapShotEventName,
+		Body: b,
+	})
+
+	assert.Len(t, snapshotManager.AddSnapshotCalledWith, 0, "expected to not add snapshot locks")
 }
