@@ -95,7 +95,19 @@ func (m *MockLockManager) AcquireLock(key, nodeID string, duration time.Duration
 }
 
 func (m *MockLockManager) GetLocks() (map[string]string, error) {
-	panic("implement me")
+	m.Mu.RLock()
+	defer m.Mu.RUnlock()
+
+	if m.locks == nil {
+		return nil, nil
+	}
+
+	locksCopy := make(map[string]string, len(m.locks))
+	for k, v := range m.locks {
+		locksCopy[k] = v
+	}
+
+	return locksCopy, nil
 }
 
 func (m *MockLockManager) DumpLocks() error {
