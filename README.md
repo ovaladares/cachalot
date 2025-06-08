@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="https://raw.githubusercontent.com/otaviohenrique/cachalot/main/assets/cachalot-logo.png" alt="Cachalot Logo" width="400"/>
+  <img src="doc/cachalot.png" alt="Cachalot Logo" width="400"/>
 </p>
 
 
