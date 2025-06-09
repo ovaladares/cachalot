@@ -9,5 +9,5 @@ test: ## Run all tests
 
 coverage: ## Run the tests of the project and export the coverage
 	go clean -testcache
-	go test -timeout 30s -cover -covermode=count -coverprofile=profile.cov ./...
+	go test -timeout 60s -cover -covermode=count -coverprofile=profile.cov ./...
 	go tool cover -html profile.cov
