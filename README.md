@@ -16,6 +16,7 @@ Cachalot is a distributed lock management system for Go applications, built on H
 - **Lock Renewal**: Extend the lifetime of held locks
 - **Node Failure Detection**: Quick detection of failed nodes
 - **Snapshot Synchronization**: New nodes can quickly sync the current lock state
+- **Distributed Task Scheduling**: Schedule and coordinate tasks across the cluster
 
 ## Installation
 
@@ -73,6 +74,75 @@ func main() {
     
     fmt.Println("Lock released successfully!")
 }
+```
+
+## Distributed Task Scheduling
+
+Cachalot includes a powerful TaskManager that enables you to schedule tasks that will be executed across your cluster with automatic coordination to ensure each task runs on only one node.
+
+### Task Features
+
+* Distributed Execution: Tasks are guaranteed to run on only one node in the cluster
+* Cron Scheduling: Supports standard cron expressions with optional seconds precision
+* Timeout Management: Tasks automatically time out after a specified duration
+* Context-aware Execution: Tasks receive a context that is canceled on timeout
+* Failure Handling: Failed tasks are logged with detailed error information
+
+Tasks coordinate across the cluster using Cachalot's distributed lock mechanism, ensuring that even if multiple nodes attempt to execute a scheduled task at the same time, only one will succeed in acquiring the lock and running the task.
+
+### Task Manager Example
+
+```go
+    coordinator := cachalot.NewCoordinator("localhost:7946", []string{"localhost:7946"}, logger)
+    err := coordinator.Connect()
+    if err != nil {
+        logger.Error("Failed to connect", "error", err)
+        return
+    }
+    
+    // Create a task manager
+    taskManager := cachalot.NewTaskManager(coordinator, logger)
+    
+    // Define tasks
+    tasks := []*cachalot.Task{
+        {
+            Name:    "daily-report",
+            Timeout: 5 * time.Minute,
+            Cron:    "0 0 0 * * *", // Midnight every day
+            ExecFn: func(ctx context.Context, execTime time.Time, taskID string) error {
+                // Implementation of your task logic
+                logger.Info("Generating daily report")
+                
+                // Check for cancellation
+                select {
+                case <-ctx.Done():
+                    return ctx.Err()
+                default:
+                    // Continue processing
+                }
+                
+                return nil
+            },
+        },
+        {
+            Name:    "hourly-cleanup",
+            Timeout: 30 * time.Second,
+            Cron:    "0 0 * * * *", // Top of every hour
+            ExecFn: func(ctx context.Context, execTime time.Time, taskID string) error {
+                // Implementation of cleanup task
+                return nil
+            },
+        },
+    }
+    
+    // Register tasks with the manager
+    taskManager.RegisterTask(tasks)
+    
+    // Start the task manager
+    taskManager.Start()
+    
+    // Stop the task manager when shutting down
+    taskManager.Stop()
 ```
 
 ## Examples
