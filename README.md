@@ -136,7 +136,7 @@ Tasks coordinate across the cluster using Cachalot's distributed lock mechanism,
     }
     
     // Register tasks with the manager
-    taskManager.RegisterTask(tasks)
+    taskManager.RegisterTasks(tasks)
     
     // Start the task manager
     taskManager.Start()

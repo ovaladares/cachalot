@@ -8,6 +8,15 @@ import (
 	"github.com/robfig/cron"
 )
 
+// Locker defines the interface for a distributed lock manager.
+// Cachalot Coordinator implements this interface to provide locking capabilities
+type Locker interface {
+	// Lock acquires a lock for the given key with a specified duration.
+	Lock(key string, duration time.Duration) error
+	// Release releases the lock for the given key.
+	Release(key string) error
+}
+
 // ExecTaskFunc defines the function signature for executing a task.
 // TaskManager will call this function to execute tasks at the scheduled time.
 type ExecTaskFunc func(ctx context.Context, execTime time.Time, taskID string) error
@@ -32,14 +41,14 @@ type Task struct {
 // TaskManager is responsible to manage task executions in a distributed environment.
 // It can coordinate the execution of tasks across all nodes joined in the cluster.
 type TaskManager struct {
-	coordinator *Coordinator
+	coordinator Locker
 	tasks       []*Task
 	cronManager *cron.Cron
 	logg        *slog.Logger
 }
 
 // NewTaskManager creates a new TaskManager instance.
-func NewTaskManager(coordinator *Coordinator, logg *slog.Logger) *TaskManager {
+func NewTaskManager(coordinator Locker, logg *slog.Logger) *TaskManager {
 	return &TaskManager{
 		coordinator: coordinator,
 		cronManager: cron.New(), // Initialize cron with seconds support
@@ -49,13 +58,22 @@ func NewTaskManager(coordinator *Coordinator, logg *slog.Logger) *TaskManager {
 }
 
 // RegisterTask registers a new task to be managed by the TaskManager.
-func (tm *TaskManager) RegisterTask(tasks []*Task) {
+func (tm *TaskManager) RegisterTasks(tasks []*Task) error {
 	tm.tasks = append(tm.tasks, tasks...)
 	for _, task := range tasks {
-		tm.cronManager.AddFunc(task.Cron, func() {
+		err := tm.cronManager.AddFunc(task.Cron, func() {
 			tm.handleTask(task)
 		})
+
+		if err != nil {
+			tm.logg.Error("Failed to register task", "task", task.Name, "error", err)
+			return err
+		}
 	}
+
+	tm.logg.Debug("Tasks registered", "count", len(tasks))
+
+	return nil
 }
 
 // Start initializes and starts the TaskManager.
