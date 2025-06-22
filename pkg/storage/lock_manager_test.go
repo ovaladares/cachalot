@@ -1,0 +1,435 @@
+package storage_test
+
+import (
+	"encoding/json"
+	"errors"
+	"testing"
+	"time"
+
+	"github.com/ovaladares/cachalot/pkg/discovery"
+	"github.com/ovaladares/cachalot/pkg/domain"
+	"github.com/ovaladares/cachalot/pkg/storage"
+	"github.com/stretchr/testify/assert"
+)
+
+type BroadcastEventInput struct {
+	EventName string
+	Data      []byte
+}
+
+type MockClusterManager struct {
+	NodeID                   string
+	BroadcastEventCalledWith []BroadcastEventInput
+	BroadcastEventErr        error
+}
+
+func (m *MockClusterManager) GetMembers() ([]*discovery.Member, error) {
+	return nil, nil
+}
+
+func (m *MockClusterManager) GetMembersCount() (int, error) {
+	return 0, nil
+}
+
+func (m *MockClusterManager) Connect() error {
+	return nil
+}
+func (m *MockClusterManager) Disconnect() error {
+	return nil
+}
+func (m *MockClusterManager) GetNodeID() string {
+	return m.NodeID
+}
+
+func (m *MockClusterManager) BroadcastEvent(event string, data []byte) error {
+	m.BroadcastEventCalledWith = append(m.BroadcastEventCalledWith, BroadcastEventInput{
+		EventName: event,
+		Data:      data,
+	})
+
+	return m.BroadcastEventErr
+}
+
+func (m *MockClusterManager) RegisterEventHandler(handler func(*discovery.ClusterEvent)) error {
+	return nil
+}
+
+func TestLockManagerIsLocked_Success(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 10*time.Second)
+	assert.True(t, ok)
+
+	assert.True(t, m.IsLocked(key))
+}
+
+func TestLockManagerIsLocked_NoLock(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	key := "value1"
+
+	assert.False(t, m.IsLocked(key))
+}
+func TestLockManagerSetLock_Success(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 10*time.Second)
+	assert.True(t, ok)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(locks))
+	assert.Equal(t, node, locks[key])
+}
+
+func TestLockManagerSetLock_SuccessRightTime(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 2*time.Second)
+	assert.True(t, ok)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(locks))
+	assert.Equal(t, node, locks[key])
+
+	time.Sleep(3 * time.Second)
+
+	locks, err = m.GetLocks()
+	assert.NoError(t, err)
+	assert.Equal(t, 0, len(locks), "lock should not exists")
+	assert.False(t, m.IsLocked(key), "lock should not exists")
+}
+
+func TestLockManagerSetLock_AlreadyLocked(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	node1 := "node1"
+	node2 := "node2"
+	key := "value1"
+
+	ok := m.SetLock(key, node1, 10*time.Second)
+	assert.True(t, ok)
+
+	ok = m.SetLock(key, node2, 10*time.Second)
+	assert.False(t, ok)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(locks))
+	assert.Equal(t, node1, locks[key])
+}
+
+func TestLockManagerGetLocks_Succes(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	node1 := "node1"
+	node2 := "node2"
+	key1 := "value1"
+	key2 := "value2"
+
+	ok := m.SetLock(key1, node1, 10*time.Second)
+	assert.True(t, ok)
+
+	ok = m.SetLock(key2, node2, 10*time.Second)
+	assert.True(t, ok)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 2, len(locks))
+	assert.Equal(t, node1, locks[key1])
+	assert.Equal(t, node2, locks[key2])
+}
+
+func TestLockManagerAcquireLock_Sucess(t *testing.T) {
+	clusterManager := &MockClusterManager{}
+
+	m := storage.NewLocalLockManager(clusterManager)
+
+	ch, err := m.AcquireLock("value1", "node1", 10*time.Second)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, ch)
+
+	assert.Equal(t, 1, len(clusterManager.BroadcastEventCalledWith))
+
+	var eventSent domain.AcquireLockEvent
+	err = json.Unmarshal(clusterManager.BroadcastEventCalledWith[0].Data, &eventSent)
+	assert.NoError(t, err)
+	assert.Equal(t, domain.ClaimKeyEventName, clusterManager.BroadcastEventCalledWith[0].EventName)
+	assert.Equal(t, "value1", eventSent.Key)
+	assert.Equal(t, "node1", eventSent.NodeID)
+	assert.Equal(t, 10*time.Second, time.Duration(eventSent.TimeMillis)*time.Millisecond)
+
+	respCh, ok := m.PendingLock("value1")
+	assert.True(t, ok)
+	assert.Equal(t, ch, respCh)
+}
+
+func TestLockManagerAcquireLock_BroadcastEventError(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{
+		BroadcastEventErr: assert.AnError,
+	})
+
+	ch, err := m.AcquireLock("value1", "node1", 10*time.Second)
+
+	assert.Error(t, err)
+	assert.Nil(t, ch)
+
+	respCh, ok := m.PendingLock("value1")
+	assert.False(t, ok)
+	assert.Nil(t, respCh)
+}
+
+func TestLockManagerDeletePendingLock_Success(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	ch, err := m.AcquireLock("value1", "node1", 10*time.Second)
+
+	assert.NoError(t, err)
+	assert.NotNil(t, ch)
+
+	m.DeletePendingLock("value1")
+
+	respCh, ok := m.PendingLock("value1")
+	assert.False(t, ok)
+	assert.Nil(t, respCh)
+}
+
+func TestLockManagerDeletePendingLock_NoPendingLock(t *testing.T) {
+	m := storage.NewLocalLockManager(&MockClusterManager{})
+
+	m.DeletePendingLock("value1")
+
+	respCh, ok := m.PendingLock("value1")
+	assert.False(t, ok)
+	assert.Nil(t, respCh)
+}
+
+func TestLockManagerRenew_Success(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID: "node1",
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.Renew(key, 20*time.Second)
+	assert.NoError(t, err)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(locks))
+	assert.Equal(t, node, locks[key])
+
+	renewLockEvent := &domain.RenewLockEvent{}
+	err = json.Unmarshal(mockClusterManager.BroadcastEventCalledWith[0].Data, renewLockEvent)
+
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(mockClusterManager.BroadcastEventCalledWith))
+	assert.Equal(t, domain.RenewLockEventName, mockClusterManager.BroadcastEventCalledWith[0].EventName)
+	assert.Equal(t, key, renewLockEvent.Key)
+	assert.Equal(t, 20*time.Second, time.Duration(renewLockEvent.TimeMillis)*time.Millisecond)
+}
+
+func TestLockManagerRenew_ErrorNodeIsNotOwnerOfLock(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID:                   "node1",
+		BroadcastEventCalledWith: []BroadcastEventInput{},
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	node := "node2"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.Renew(key, 20*time.Second)
+	assert.Error(t, err)
+
+	assert.Equal(t, 0, len(mockClusterManager.BroadcastEventCalledWith))
+}
+
+func TestLockManagerRenew_ErrorNotLocked(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID:                   "node1",
+		BroadcastEventCalledWith: []BroadcastEventInput{},
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	key := "value1"
+
+	err := m.Renew(key, 20*time.Second)
+	assert.Error(t, err)
+
+	assert.Equal(t, 0, len(mockClusterManager.BroadcastEventCalledWith))
+}
+
+func TestLockManagerRenew_BroadcastEventErr(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID:            "node1",
+		BroadcastEventErr: errors.New("broadcast event error"),
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.Renew(key, 20*time.Second)
+	assert.Error(t, err)
+
+	renewLockEvent := &domain.RenewLockEvent{}
+	err = json.Unmarshal(mockClusterManager.BroadcastEventCalledWith[0].Data, renewLockEvent)
+
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(mockClusterManager.BroadcastEventCalledWith))
+	assert.Equal(t, domain.RenewLockEventName, mockClusterManager.BroadcastEventCalledWith[0].EventName)
+	assert.Equal(t, key, renewLockEvent.Key)
+	assert.Equal(t, 20*time.Second, time.Duration(renewLockEvent.TimeMillis)*time.Millisecond)
+}
+
+func TestLockManagerRenewLock_Success(t *testing.T) {
+	mockClusterManager := &MockClusterManager{}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	node := "node1"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 1*time.Second)
+	assert.True(t, ok)
+
+	err := m.RenewLock(key, 20*time.Second.Milliseconds())
+	assert.NoError(t, err)
+
+	time.Sleep(2 * time.Second)
+
+	locks, err := m.GetLocks()
+
+	assert.NoError(t, err)
+	assert.Equal(t, 1, len(locks))
+	assert.Equal(t, node, locks[key])
+}
+
+func TestLockManagerRelease_ErrorNotLockOwner(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID: "node1",
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	node := "node2"
+	key := "value1"
+
+	ok := m.SetLock(key, node, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.Release(key)
+	assert.Error(t, err, "lock is held by another node error")
+	assert.Equal(t, 0, len(mockClusterManager.BroadcastEventCalledWith), "no event should be sent")
+}
+
+func TestLockManagerRelease_ErrorNotLocked(t *testing.T) {
+	mockClusterManager := &MockClusterManager{
+		NodeID: "node1",
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	err := m.Release("value1")
+	assert.Error(t, err, "lock doesn't exist")
+	assert.Equal(t, 0, len(mockClusterManager.BroadcastEventCalledWith), "no event should be sent")
+}
+func TestLockManagerRelease_Success(t *testing.T) {
+	nodeID := "node1"
+	key := "value1"
+
+	mockClusterManager := &MockClusterManager{
+		NodeID: nodeID,
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	ok := m.SetLock(key, nodeID, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.Release(key)
+	assert.NoError(t, err)
+
+	assert.Equal(t, 1, len(mockClusterManager.BroadcastEventCalledWith), "release event should be sent")
+
+	var releaseLockEvent domain.ReleaseLockEvent
+	err = json.Unmarshal(mockClusterManager.BroadcastEventCalledWith[0].Data, &releaseLockEvent)
+	assert.NoError(t, err)
+
+	assert.Equal(t, domain.ReleaseLockEventName, mockClusterManager.BroadcastEventCalledWith[0].EventName)
+	assert.Equal(t, key, releaseLockEvent.Key)
+	assert.Equal(t, nodeID, releaseLockEvent.NodeID)
+}
+
+func TestLockManagerReleaseLock_Success(t *testing.T) {
+	nodeID := "node1"
+	key := "value1"
+
+	mockClusterManager := &MockClusterManager{
+		NodeID: nodeID,
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	ok := m.SetLock(key, nodeID, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.ReleaseLock(key)
+	assert.NoError(t, err)
+
+	locks, err := m.GetLocks()
+	assert.NoError(t, err)
+
+	assert.Equal(t, 0, len(locks), "lock should not exists")
+}
+
+func TestLockManagerReleaseLock_ErrorLockDoesntExist(t *testing.T) {
+	nodeID := "node1"
+	key := "value1"
+
+	mockClusterManager := &MockClusterManager{
+		NodeID: nodeID,
+	}
+
+	m := storage.NewLocalLockManager(mockClusterManager)
+
+	ok := m.SetLock(key, nodeID, 10*time.Second)
+	assert.True(t, ok)
+
+	err := m.ReleaseLock("node2")
+	assert.Error(t, err)
+}
